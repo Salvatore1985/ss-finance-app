@@ -36,3 +36,4 @@ npm run dev
 ```sh
 npm run build
 ```
+# ss-finance-app
