@@ -2,6 +2,7 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { supabase } from '../supabase'
 import DettaglioMovimento from '../components/DettaglioMovimento.vue'
+import ActionButtons from '../components/ActionButtons.vue'
 
 // --- STATO ---
 const loading = ref(false)
@@ -114,7 +115,24 @@ const cerca = async () => {
       .order('data', { ascending: false })
       .limit(200)
 
-    if (filters.value.keyword) query = query.ilike('descrizione', `%${filters.value.keyword}%`)
+    if (filters.value.keyword.trim()) {
+      const escapeForIlike = (text) => text
+        // PostgREST usa "*" come wildcard: escape di * per ricerca letterale
+        .replaceAll('*', '\\*')
+        // Escapa anche caratteri speciali SQL che possono alterare il pattern
+        .replaceAll('%', '\\%')
+        .replaceAll('_', '\\_')
+        // Virgola va escapata perché separatore nella clausola OR
+        .replaceAll(',', '\\,')
+
+      const kw = escapeForIlike(filters.value.keyword.trim())
+      // OR su descrizione, note, conto, categoria con wildcard * riconosciuta da PostgREST
+      query = query.or(
+        `descrizione.ilike.*${kw}*,note.ilike.*${kw}*,conto.ilike.*${kw}*,categoria.ilike.*${kw}*`
+      )
+    }
+
+    //-if (filters.value.keyword) query = query.ilike('descrizione', `%${filters.value.keyword}%`)
     if (filters.value.dateStart) query = query.gte('data', filters.value.dateStart)
     if (filters.value.dateEnd) query = query.lte('data', filters.value.dateEnd)
     if (filters.value.tipo !== 'Tutti') query = query.eq('tipo', filters.value.tipo)
@@ -148,7 +166,9 @@ const toggleExpand = (id) => {
   if (expandedRows.value.has(id)) expandedRows.value.delete(id)
   else expandedRows.value.add(id)
 }
-const apriDettaglio = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'view') }
+const apriVisualizza = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'view') }
+const apriModifica = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'edit') }
+const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'split') }
 </script>
 
 <template>
@@ -306,9 +326,11 @@ const apriDettaglio = (mov) => { if (refDettaglio.value) refDettaglio.value.apri
               <div class="fw-bold mb-2 text-nowrap fs-6" :class="mov.tipo === 'Uscita' ? 'text-dark' : 'text-success'">
                 {{ mov.importo }} €
               </div>
-              <button @click="apriDettaglio(mov)" class="btn btn-sm btn-light border rounded-circle shadow-sm" style="width: 32px; height: 32px;">
-                <i class="bi bi-three-dots-vertical text-muted"></i>
-              </button>
+              <ActionButtons
+                @view="apriVisualizza(mov)"
+                @edit="apriModifica(mov)"
+                @split="apriDividi(mov)"
+              />
             </div>
           </div>
         </div>

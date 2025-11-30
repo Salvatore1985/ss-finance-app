@@ -109,6 +109,9 @@ onMounted(() => {
         <button class="btn btn-nav" :class="{ active: route.name === 'storico' }" @click="vaiA('/storico')">
           <i class="bi bi-search"></i> Storico
         </button>
+        <button class="btn btn-nav" :class="{ active: route.name === 'check' }" @click="vaiA('/check')">
+          <i class="bi bi-check-circle-fill"></i> Check
+        </button>
         <button class="btn btn-nav" :class="{ active: route.name === 'importa' }" @click="vaiA('/importa')">
           <i class="bi bi-cloud-arrow-up-fill"></i> Importa
         </button>
@@ -218,7 +221,10 @@ onMounted(() => {
       <i class="bi bi-search"></i>
       <span>Storico</span>
     </div>
-
+    <div class="nav-item" :class="{ active: route.name === 'check' }" @click="vaiA('/check')">
+      <i class="bi bi-check-circle-fill"></i>
+      <span>Check</span>
+    </div>
     <div class="nav-item-fab" @click="apriNuovo">
       <i class="bi bi-plus-lg"></i>
     </div>

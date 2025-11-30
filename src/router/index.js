@@ -7,7 +7,7 @@ import StoricoView from '../views/StoricoView.vue'
 import ImportaView from '../views/ImportaView.vue'
 import ConfigView from '../views/ConfigView.vue'
 import LoginView from '../views/LoginView.vue' // <--- NUOVO
-
+import CheckView from '../views/CheckView.vue'
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -16,7 +16,8 @@ const router = createRouter({
     { path: '/movimenti', name: 'movimenti', component: MovimentiView },
     { path: '/storico', name: 'storico', component: StoricoView },
     { path: '/importa', name: 'importa', component: ImportaView },
-    { path: '/config', name: 'config', component: ConfigView }
+    { path: '/config', name: 'config', component: ConfigView },
+    { path: '/check', name: 'check', component: CheckView },
   ]
 })
 

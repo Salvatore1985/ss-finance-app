@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { supabase } from '../supabase'
 import DettaglioMovimento from '../components/DettaglioMovimento.vue'
-
+import ActionButtons from '../components/ActionButtons.vue'
 const movimenti = ref([])
 const caricamento = ref(true)
 const refDettaglio = ref(null)
@@ -88,27 +88,11 @@ onMounted(() => {
             </div>
           </div>
 
-          <!-- PARTE DESTRA (I 3 BOTTONI) -->
-          <!-- d-flex gap-2: mette i bottoni vicini -->
-          <div class="d-flex gap-2 justify-content-end w-100 w-md-auto mt-2 mt-md-0">
-            
-            <!-- 1. OCCHIO (Vedi) -->
-            <button @click="vediDettaglio(mov)" class="btn btn-white border shadow-sm btn-action text-primary" title="Dettaglio">
-              <i class="bi bi-eye"></i>
-            </button>
-
-            <!-- 2. MATITA (Modifica) -->
-            <button @click="modificaMovimento(mov)" class="btn btn-white border shadow-sm btn-action text-dark" title="Modifica">
-              <i class="bi bi-pencil"></i>
-            </button>
-
-            <!-- 3. FORBICE (Dividi) -->
-            <button @click="dividiMovimento(mov)" class="btn btn-white border shadow-sm btn-action text-dark" title="Dividi">
-              <i class="bi bi-scissors"></i>
-            </button>
-
-          </div>
-
+            <ActionButtons
+            @view="vediDettaglio(mov)"
+            @edit="modificaMovimento(mov)"
+            @split="dividiMovimento(mov)"
+          />      
         </div>
       </div>
       
@@ -123,24 +107,3 @@ onMounted(() => {
   </div>
 </template>
 
-<style scoped>
-/* Stile per i bottoni quadrati come nell'immagine */
-.btn-action {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px; /* Bordi arrotondati come le card */
-  transition: all 0.2s;
-  background-color: #fff;
-}
-.btn-action:hover {
-  background-color: #f8fafc;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-.btn-white {
-  background-color: white;
-}
-</style>

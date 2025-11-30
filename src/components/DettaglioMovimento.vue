@@ -5,9 +5,11 @@ import { Modal } from 'bootstrap'
 
 const emit = defineEmits(['refresh'])
 const movimento = ref(null)
-const mode = ref('view') 
+const mode = ref('view')
 const loading = ref(false)
 const availableTags = ref([]) // Lista tag dal DB
+const availableAccounts = ref([])
+const availableCategories = ref([])
 
 // Dati temporanei
 const editForm = ref({ tags: [] })
@@ -15,8 +17,15 @@ const splitForm = ref({ amount: '', category: '' })
 
 // Carica tag disponibili
 onMounted(async () => {
-  const { data } = await supabase.from('tags').select('*').order('nome')
-  if (data) availableTags.value = data
+  const [{ data: tags }, { data: conti }, { data: categorie }] = await Promise.all([
+    supabase.from('tags').select('*').order('nome'),
+    supabase.from('conti').select('nome').order('nome'),
+    supabase.from('categorie').select('nome').order('nome')
+  ])
+
+  if (tags) availableTags.value = tags
+  if (conti) availableAccounts.value = conti
+  if (categorie) availableCategories.value = categorie
 })
 
 const splitRimanente = computed(() => {
@@ -158,13 +167,37 @@ const chiudiEaggiorna = () => {
           <!-- MODIFICA -->
           <div v-if="mode === 'edit'">
             <h6 class="fw-bold mb-3 text-primary">Modifica</h6>
-            
+
             <div class="mb-3">
               <label class="small fw-bold text-muted">Descrizione</label>
               <input v-model="editForm.descrizione" class="form-control fw-bold">
             </div>
 
-            <!-- ... Altri campi Importo/Data ... -->
+            <div class="row g-3 mb-3">
+              <div class="col-6">
+                <label class="small fw-bold text-muted">Importo</label>
+                <input v-model="editForm.importo" type="number" step="0.01" class="form-control">
+              </div>
+              <div class="col-6">
+                <label class="small fw-bold text-muted">Data</label>
+                <input v-model="editForm.data" type="date" class="form-control">
+              </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-6">
+                <label class="small fw-bold text-muted">Categoria</label>
+                <select v-model="editForm.categoria" class="form-select">
+                  <option v-for="c in availableCategories" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="small fw-bold text-muted">Conto</label>
+                <select v-model="editForm.conto" class="form-select">
+                  <option v-for="c in availableAccounts" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                </select>
+              </div>
+            </div>
 
             <!-- EDITOR TAG MULTIPLI -->
             <div class="mb-4">
