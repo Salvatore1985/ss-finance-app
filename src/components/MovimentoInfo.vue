@@ -52,6 +52,12 @@ const formattedDate = computed(() => {
 
 <template>
   <div class="d-flex align-items-start gap-3 w-100">
+    <div>
+        <span v-if="formattedDate" class="badge badge-soft d-inline-flex align-items-center gap-1">
+        <i class="bi bi-calendar-event"></i>
+        {{ formattedDate }}
+        </span>
+    </div>
     <div class="movement-icon shadow-sm" :class="iconWrapperClass">
       <i class="bi fs-5" :class="iconClass"></i>
     </div>
@@ -76,7 +82,6 @@ const formattedDate = computed(() => {
       <div class="small text-muted d-flex align-items-center flex-wrap gap-2 mt-1">
         <span class="badge badge-soft">{{ movimento.conto }}</span>
         <span class="badge badge-soft">{{ movimento.categoria }}</span>
-        <span v-if="formattedDate" class="small">{{ formattedDate }}</span>
         <i v-if="showAttachments && movimento.note" class="bi bi-sticky-fill text-warning"></i>
         <i v-if="showAttachments && movimento.file_url" class="bi bi-paperclip text-secondary"></i>
       </div>

@@ -288,7 +288,7 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
       </div>
 
         <div v-else class="list-group list-group-flush">
-          <div v-for="mov in movimenti" :key="mov.id" class="list-group-item p-3 border-light">
+          <div v-for="mov in movimenti" :key="mov.id" class="list-group-item p-3 border-light border-3">
             <MovimentoInfo
               :movimento="mov"
               :expanded="expandedRows.has(mov.id)"
