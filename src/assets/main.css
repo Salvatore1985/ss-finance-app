@@ -1,0 +1,161 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+:root {
+  /* Il viola esatto delle tue immagini */
+  --primary: #5451e9; 
+  --primary-dark: #3e3abf;
+  --primary-light: #e0e7ff;
+  
+  --bg-body: #f3f4f6; /* Grigio chiarissimo di sfondo */
+  --card-bg: #ffffff;
+  
+  --text-main: #334155;
+  --text-muted: #94a3b8;
+  
+  /* Arrotondamento più forte come nelle foto */
+  --radius-lg: 24px; 
+  --radius-md: 16px;
+  
+  --shadow-sm: 0 2px 4px rgba(0,0,0,0.02);
+  --shadow-md: 0 10px 30px -10px rgba(0,0,0,0.1);
+}
+
+/* Aggiorniamo le card per usare il nuovo raggio */
+.card {
+  border: none;
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Stile specifico per il Banner Viola (Config e Dashboard) */
+.bg-purple-gradient {
+  background: linear-gradient(135deg, #7c3aed 0%, #5451e9 100%);
+  color: white;
+}
+
+/* Input e Select più rotondi */
+.form-control, .form-select {
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  padding: 12px;
+}
+
+/* Badge dei Tag (Gialli) */
+.badge-tag {
+  background-color: #fef9c3;
+  color: #854d0e;
+  border: 1px solid #fde047;
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-weight: 600;
+  font-size: 0.75rem;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  background-color: var(--bg-body);
+  color: var(--text-main);
+  /* Spazio sotto per il menu mobile, spazio sopra per il menu desktop */
+  padding-bottom: 80px; 
+}
+
+/* Sfondo Blob */
+.bg-blob {
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 60%;
+  height: 400px;
+  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(248,250,252,0) 70%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* --- NAVBAR DESKTOP (Stile Originale) --- */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.btn-nav {
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 10px;
+  border: none;
+  background: transparent;
+  transition: all 0.2s;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-nav:hover, .btn-nav.active {
+  background: var(--primary-light);
+  color: var(--primary);
+}
+
+/* --- NAVBAR MOBILE (Bottom Bar) --- */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
+  display: flex;
+  justify-content: space-around; /* Distanzia gli elementi */
+  align-items: flex-end; /* Allinea in basso */
+  padding: 10px 15px 15px 15px; /* Più spazio sotto per gli iPhone recenti */
+  z-index: 1000;
+  border-top: 1px solid #f1f5f9;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 5px;
+  width: 60px; /* Larghezza fissa per centrare */
+}
+
+.nav-item i { font-size: 1.4rem; margin-bottom: 4px; transition: transform 0.2s; }
+.nav-item.active { color: var(--primary); }
+.nav-item.active i { transform: translateY(-2px); }
+
+/* FAB Mobile (Bottone Centrale) */
+.nav-item-fab {
+  width: 56px;
+  height: 56px;
+  background: var(--primary);
+  border-radius: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: white;
+  font-size: 1.8rem;
+  box-shadow: 0 8px 15px rgba(99, 102, 241, 0.4);
+  transform: translateY(-25px); /* Esce fuori dalla barra */
+  cursor: pointer;
+  transition: transform 0.2s;
+  z-index: 1001;
+}
+.nav-item-fab:active { transform: translateY(-20px) scale(0.95); }
+
+/* Utilities */
+
+.bg-gradient-primary { background: linear-gradient(135deg, #6366f1 0%, #4338ca 100%); }
