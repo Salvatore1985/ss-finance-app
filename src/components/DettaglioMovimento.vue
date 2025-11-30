@@ -5,86 +5,42 @@ import { Modal } from 'bootstrap'
 
 const emit = defineEmits(['refresh'])
 const movimento = ref(null)
-const mode = ref('view')
+const mode = ref('view') 
 const loading = ref(false)
-const availableTags = ref([]) // Lista tag dal DB
-const availableAccounts = ref([])
-const availableCategories = ref([])
 
-// Dati temporanei
+// Liste Dinamiche
+const listaConti = ref([])
+const listaCategorie = ref([])
+const listaTag = ref([])
+
 const editForm = ref({ tags: [] })
 const splitForm = ref({ amount: '', category: '' })
 
-// Carica tag disponibili
+// Caricamento Dati all'avvio
 onMounted(async () => {
-  const [{ data: tags }, { data: conti }, { data: categorie }] = await Promise.all([
-    supabase.from('tags').select('*').order('nome'),
-    supabase.from('conti').select('nome').order('nome'),
-    supabase.from('categorie').select('nome').order('nome')
-  ])
+  const { data: c } = await supabase.from('conti').select('nome').order('nome')
+  if (c) listaConti.value = c
 
-  if (tags) availableTags.value = tags
-  if (conti) availableAccounts.value = conti
-  if (categorie) availableCategories.value = categorie
+  const { data: cat } = await supabase.from('categorie').select('nome').order('nome')
+  if (cat) listaCategorie.value = cat
+
+  const { data: t } = await supabase.from('tags').select('nome').order('nome')
+  if (t) listaTag.value = t
 })
-
-
-
-function parseAmountInput (value) {
-  if (value === null || value === undefined || value === '') return NaN
-
-  const stringValue = typeof value === 'string' ? value : String(value)
-  const normalizzato = stringValue.replace(',', '.').trim()
-
-  return parseFloat(normalizzato)
-}
-
-function normalizeSplitAmount (value) {
-  if (value === null || value === undefined || value === '') return NaN
-
-  const stringValue = typeof value === 'string' ? value : String(value)
-  const normalizzato = stringValue.replace(',', '.').trim()
-
-  return parseFloat(normalizzato)
-}
-
-async function resolveUserId (baseUserId) {
-  if (baseUserId) return baseUserId
-
-  const [{ data: userData, error: userError }, { data: sessionData, error: sessionError }] = await Promise.all([
-    supabase.auth.getUser(),
-    supabase.auth.getSession()
-  ])
-
-  if (userError) console.error('Errore getUser:', userError)
-  if (sessionError) console.error('Errore getSession:', sessionError)
-
-  return userData?.user?.id || sessionData?.session?.user?.id || null
-}
 
 const splitRimanente = computed(() => {
   if (!movimento.value) return 0
-
-  const totale = parseFloat(movimento.value.importo)
-  const totaleAssoluto = Math.abs(totale)
-  const quota = Math.abs(normalizeSplitAmount(splitForm.value.amount)) || 0
-  const rimanenteAssoluto = Math.max(totaleAssoluto - quota, 0)
-  const segno = totale >= 0 ? 1 : -1
-
-  return (rimanenteAssoluto * segno).toFixed(2)
+  const tot = parseFloat(movimento.value.importo)
+  const part = parseFloat(splitForm.value.amount) || 0
+  return (tot - part).toFixed(2)
 })
+
 const apri = (mov, modalitaIniziale = 'view') => {
   movimento.value = mov
   mode.value = modalitaIniziale
   
-  // Clona i dati. IMPORTANTE: Se tags è null, usa array vuoto []
   editForm.value = { ...mov, tags: mov.tags || [] }
-
-  splitForm.value = {
-    amount: '',
-    category: mov.categoria || '',
-    description: `${mov.descrizione} (split)`
-  }
+  splitForm.value = { amount: '', category: '' }
 
   const el = document.getElementById('modalDettaglio')
   const modal = new Modal(el)
@@ -93,7 +49,6 @@ const apri = (mov, modalitaIniziale = 'view') => {
 
 defineExpose({ apri })
 
-// Gestione Tag in Modifica
 const aggiungiTag = (event) => {
   const val = event.target.value
   if (val && !editForm.value.tags.includes(val)) {
@@ -101,11 +56,8 @@ const aggiungiTag = (event) => {
   }
   event.target.value = ""
 }
-const rimuoviTag = (idx) => {
-  editForm.value.tags.splice(idx, 1)
-}
+const rimuoviTag = (idx) => editForm.value.tags.splice(idx, 1)
 
-// SALVA MODIFICA (Incluso Array Tag)
 const salvaModifica = async () => {
   try {
     loading.value = true
@@ -117,8 +69,8 @@ const salvaModifica = async () => {
         data: editForm.value.data,
         categoria: editForm.value.categoria,
         conto: editForm.value.conto,
-        tags: editForm.value.tags, // <--- Salva l'array
-        is_manual: true // Protegge dal ricalcolo
+        tags: editForm.value.tags,
+        is_manual: true
       })
       .eq('id', movimento.value.id)
 
@@ -141,68 +93,35 @@ const elimina = async () => {
 }
 
 const eseguiSplit = async () => {
-  if (!movimento.value) return
-
-  const totale = parseFloat(movimento.value.importo)
-  const totaleAssoluto = Math.abs(totale)
-  const quota = Math.abs(normalizeSplitAmount(splitForm.value.amount))
-
-  if (Number.isNaN(quota) || quota <= 0) {
-    alert('Inserisci un importo valido per la quota da dividere')
-    return
-  }
-
-  if (quota >= totaleAssoluto) {
-    alert('L\'importo da dividere deve essere inferiore al totale del movimento')
-    return
-  }
-
-  if (!splitForm.value.category) {
-    alert('Seleziona una categoria per la nuova quota')
-    return
-  }
+  const imp = parseFloat(splitForm.value.amount)
+  if (!imp || !splitForm.value.category) return alert("Compila")
+  if (imp >= movimento.value.importo) return alert("Importo troppo alto")
 
   try {
     loading.value = true
+    const { data: { user } } = await supabase.auth.getUser()
+    const rimasto = movimento.value.importo - imp
 
-    const segno = totale >= 0 ? 1 : -1
-    const restante = parseFloat((totaleAssoluto - quota).toFixed(2)) * segno
-    const base = movimento.value
-    const userId = await resolveUserId(base.user_id)
+    // Update vecchio
+    await supabase.from('transazioni')
+      .update({ importo: rimasto, descrizione: movimento.value.descrizione + ' (Split)' })
+      .eq('id', movimento.value.id)
 
-    if (!userId) {
-      alert('Impossibile determinare l\'utente corrente. Effettua di nuovo il login e riprova.')
-      return
-    }
-
-    const { error: insertError } = await supabase.from('transazioni').insert({
-      descrizione: splitForm.value.description?.trim() || `${base.descrizione} (split)`,
-      importo: parseFloat((quota * segno).toFixed(2)),
-      data: base.data,
-      categoria: splitForm.value.category,
-      conto: base.conto,
-      tipo: base.tipo,
-      tags: base.tags || [],
-      user_id: userId,
-      is_manual: true
-    })
-
-    if (insertError) throw insertError
-
-    const { error: updateError } = await supabase
-      .from('transazioni')
-      .update({ importo: restante, is_manual: true })
-      .eq('id', base.id)
-      .eq('user_id', userId)
-      
-    if (updateError) throw updateError
+    // Insert nuovo
+    await supabase.from('transazioni')
+      .insert([{
+        user_id: user.id,
+        data: movimento.value.data,
+        descrizione: movimento.value.descrizione + ' (Split)',
+        importo: imp,
+        tipo: movimento.value.tipo,
+        categoria: splitForm.value.category,
+        conto: movimento.value.conto,
+        stato: 'confermato'
+      }])
 
     chiudiEaggiorna()
-  } catch (e) {
-    alert('Errore split: ' + e.message)
-  } finally {
-    loading.value = false
-  }
+  } catch(e) { alert(e.message) } finally { loading.value = false }
 }
 
 const chiudiEaggiorna = () => {
@@ -220,7 +139,6 @@ const chiudiEaggiorna = () => {
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg overflow-hidden" style="border-radius: 20px;">
         
-        <!-- HEADER -->
         <div class="modal-header border-0 text-white p-4" 
              :class="movimento?.tipo === 'Entrata' ? 'bg-success' : 'bg-primary'">
           <div>
@@ -237,7 +155,6 @@ const chiudiEaggiorna = () => {
           <!-- VISTA -->
           <div v-if="mode === 'view'">
             <h5 class="fw-bold mb-3 text-dark">{{ movimento?.descrizione }}</h5>
-            
             <div class="row g-3 mb-4">
               <div class="col-6">
                 <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Categoria</small>
@@ -248,14 +165,11 @@ const chiudiEaggiorna = () => {
                 <div class="fw-medium text-dark"><i class="bi bi-bank2 me-1 text-secondary"></i> {{ movimento?.conto }}</div>
               </div>
             </div>
-
-            <!-- VISUALIZZAZIONE TAG -->
+            
+            <!-- TAG VISTA -->
             <div class="mb-4" v-if="movimento?.tags && movimento.tags.length > 0">
-               <small class="text-muted fw-bold text-uppercase d-block mb-2" style="font-size: 0.7rem;">Tag</small>
                <div class="d-flex flex-wrap gap-2">
-                 <span v-for="t in movimento.tags" :key="t" class="badge bg-warning text-dark border border-warning rounded-pill">
-                   #{{ t }}
-                 </span>
+                 <span v-for="t in movimento.tags" :key="t" class="badge bg-warning text-dark border border-warning rounded-pill">#{{ t }}</span>
                </div>
             </div>
 
@@ -268,52 +182,43 @@ const chiudiEaggiorna = () => {
           <!-- MODIFICA -->
           <div v-if="mode === 'edit'">
             <h6 class="fw-bold mb-3 text-primary">Modifica</h6>
-
+            
             <div class="mb-3">
-              <label class="small fw-bold text-muted">Descrizione</label>
               <input v-model="editForm.descrizione" class="form-control fw-bold">
             </div>
 
-            <div class="row g-3 mb-3">
-              <div class="col-6">
-                <label class="small fw-bold text-muted">Importo</label>
-                <input v-model="editForm.importo" type="number" step="0.01" class="form-control">
-              </div>
-              <div class="col-6">
-                <label class="small fw-bold text-muted">Data</label>
-                <input v-model="editForm.data" type="date" class="form-control">
-              </div>
+            <div class="row g-2 mb-3">
+               <div class="col-6"><input v-model="editForm.importo" type="number" step="0.01" class="form-control"></div>
+               <div class="col-6"><input v-model="editForm.data" type="date" class="form-control"></div>
             </div>
 
-            <div class="row g-3 mb-4">
-              <div class="col-6">
-                <label class="small fw-bold text-muted">Categoria</label>
-                <select v-model="editForm.categoria" class="form-select">
-                  <option v-for="c in availableCategories" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
-                </select>
-              </div>
-              <div class="col-6">
-                <label class="small fw-bold text-muted">Conto</label>
-                <select v-model="editForm.conto" class="form-select">
-                  <option v-for="c in availableAccounts" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
-                </select>
-              </div>
+            <!-- SELECT DINAMICHE -->
+            <div class="row g-2 mb-4">
+               <div class="col-6">
+                 <label class="small text-muted">Categoria</label>
+                 <select v-model="editForm.categoria" class="form-select">
+                   <option v-for="c in listaCategorie" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                 </select>
+               </div>
+               <div class="col-6">
+                 <label class="small text-muted">Conto</label>
+                 <select v-model="editForm.conto" class="form-select">
+                   <option v-for="c in listaConti" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                 </select>
+               </div>
             </div>
 
-            <!-- EDITOR TAG MULTIPLI -->
-            <div class="mb-4">
-               <label class="small fw-bold text-muted mb-1">Tag</label>
-               <div class="border rounded-3 p-2 bg-light">
+            <!-- TAG DINAMICI -->
+            <div class="mb-4 border rounded-3 p-2 bg-light">
                  <div class="d-flex flex-wrap gap-2 mb-2" v-if="editForm.tags && editForm.tags.length > 0">
                    <span v-for="(t, idx) in editForm.tags" :key="idx" class="badge bg-warning text-dark border border-warning rounded-pill px-3 d-flex align-items-center">
                      #{{ t }} <i class="bi bi-x-circle-fill ms-2 cursor-pointer opacity-50" @click="rimuoviTag(idx)"></i>
                    </span>
                  </div>
                  <select class="form-select form-select-sm border-0 bg-transparent" @change="aggiungiTag">
-                   <option value="" selected>+ Aggiungi Tag...</option>
-                   <option v-for="t in availableTags" :key="t.id" :value="t.nome">{{ t.nome }}</option>
+                   <option value="" selected>+ Tag</option>
+                   <option v-for="t in listaTag" :key="t.nome" :value="t.nome">{{ t.nome }}</option>
                  </select>
-               </div>
             </div>
 
             <div class="d-flex gap-2">
@@ -322,57 +227,23 @@ const chiudiEaggiorna = () => {
             </div>
           </div>
 
-          <!-- SPLIT -->
+          <!-- SPLIT (DINAMICO) -->
           <div v-if="mode === 'split'">
-            <h6 class="fw-bold mb-3 text-primary">Dividi movimento</h6>
-
-            <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center">
-              <div>
-                <div class="text-muted small">Totale</div>
-                <div class="fw-bold">{{ parseFloat(movimento?.importo || 0).toFixed(2) }} €</div>
-              </div>
-              <div class="text-end">
-                <div class="text-muted small">Rimanente dopo split</div>
-                <div class="fw-bold">{{ splitRimanente }} €</div>
-              </div>
-            </div>
-
+            <h6 class="fw-bold mb-3 text-warning text-dark">Dividi Spesa</h6>
             <div class="mb-3">
-              <label class="small fw-bold text-muted">Quota da spostare</label>
-              <input
-                v-model="splitForm.amount"
-                type="number"
-                step="0.01"
-                min="0"
-                class="form-control"
-                placeholder="0.00"
-              >
+              <label class="small text-muted">Quanto stacchi?</label>
+              <input v-model="splitForm.amount" type="number" step="0.01" class="form-control fw-bold fs-5">
+              <div class="text-end small text-muted mt-1">Rimanente: <b>{{ splitRimanente }} €</b></div>
             </div>
-
-            <div class="mb-3">
-              <label class="small fw-bold text-muted">Categoria per la nuova quota</label>
+            <div class="mb-4">
+              <label class="small text-muted">Nuova Categoria</label>
               <select v-model="splitForm.category" class="form-select">
-                <option value="" disabled>Seleziona categoria</option>
-                <option v-for="c in availableCategories" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                 <option v-for="c in listaCategorie" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
               </select>
             </div>
-
-            <div class="mb-4">
-              <label class="small fw-bold text-muted">Descrizione nuova quota</label>
-              <input
-                v-model="splitForm.description"
-                type="text"
-                class="form-control"
-                placeholder="Descrizione della parte divisa"
-              >
-            </div>
-
             <div class="d-flex gap-2">
               <button @click="mode='view'" class="btn btn-light w-100 fw-bold">Annulla</button>
-              <button @click="eseguiSplit" class="btn btn-primary w-100 fw-bold text-white" :disabled="loading">
-                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
-                Conferma split
-              </button>
+              <button @click="eseguiSplit" class="btn btn-warning w-100 fw-bold">Conferma</button>
             </div>
           </div>
 

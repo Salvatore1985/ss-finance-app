@@ -71,8 +71,6 @@ const toggleTag = (tagName) => {
   } else {
     filters.value.tags.splice(index, 1) // Rimuovi
   }
-  // Opzionale: cerca subito appena tocchi un tag? 
-  // Per ora no, meglio premere Cerca per non fare troppe chiamate
 }
 
 // --- WATCHERS ---
@@ -116,24 +114,22 @@ const cerca = async () => {
       .order('data', { ascending: false })
       .limit(200)
 
+    // RICERCA AVANZATA (OR su più campi)
     if (filters.value.keyword.trim()) {
       const escapeForIlike = (text) => text
-        // PostgREST usa "*" come wildcard: escape di * per ricerca letterale
         .replaceAll('*', '\\*')
-        // Escapa anche caratteri speciali SQL che possono alterare il pattern
         .replaceAll('%', '\\%')
         .replaceAll('_', '\\_')
-        // Virgola va escapata perché separatore nella clausola OR
         .replaceAll(',', '\\,')
 
       const kw = escapeForIlike(filters.value.keyword.trim())
-      // OR su descrizione, note, conto, categoria con wildcard * riconosciuta da PostgREST
+      // Cerca in descrizione, note, conto e categoria
       query = query.or(
         `descrizione.ilike.*${kw}*,note.ilike.*${kw}*,conto.ilike.*${kw}*,categoria.ilike.*${kw}*`
       )
     }
 
-    //-if (filters.value.keyword) query = query.ilike('descrizione', `%${filters.value.keyword}%`)
+    // Filtri Standard
     if (filters.value.dateStart) query = query.gte('data', filters.value.dateStart)
     if (filters.value.dateEnd) query = query.lte('data', filters.value.dateEnd)
     if (filters.value.tipo !== 'Tutti') query = query.eq('tipo', filters.value.tipo)
@@ -167,18 +163,20 @@ const toggleExpand = (id) => {
   if (expandedRows.value.has(id)) expandedRows.value.delete(id)
   else expandedRows.value.add(id)
 }
+
+// Wrapper per le funzioni del modale
 const apriVisualizza = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'view') }
 const apriModifica = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'edit') }
 const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mov, 'split') }
 </script>
 
 <template>
-  <div class="d-flex flex-column h-100 container py-3" style="max-height: calc(100vh - 80px);">
+  <div class="d-flex flex-column h-100 container py-1" style="max-height: calc(100vh - 80px);">
     
     <!-- === SEZIONE FILTRI FISSA === -->
-    <div class="flex-shrink-0 mb-3">
+    <div class="flex-shrink-0 mb-2">
       
-      <div class="card border-0 shadow-sm p-3 bg-white">
+      <div class="card border-0 shadow-sm p-2 bg-white">
         
         <!-- 1. RICERCA CON SUGGERIMENTI CUSTOM -->
         <div class="position-relative mb-2">
@@ -244,7 +242,6 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
         </div>
 
         <!-- 4. SELETTORI TAG (SCORREVOLI) -->
-        <!-- Se non ci sono tag, non mostrare nulla -->
         <div v-if="options.tags.length > 0" class="border-top pt-2 mt-2">
           <div class="small text-muted fw-bold mb-1" style="font-size: 0.7rem;">FILTRA PER TAG (Seleziona più di uno)</div>
           <div class="d-flex gap-2 overflow-auto pb-2 no-scrollbar">
@@ -287,31 +284,34 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
         Nessun movimento trovato.
       </div>
 
-        <div v-else class="list-group list-group-flush">
-          <div v-for="mov in movimenti" :key="mov.id" class="list-group-item p-3 border-light border-3">
-            <MovimentoInfo
-              :movimento="mov"
-              :expanded="expandedRows.has(mov.id)"
-              date-variant="long"
-              amount-mode="raw"
-              :show-tags="true"
-              :show-attachments="true"
-              @toggle="toggleExpand(mov.id)"
-            >
-              <template #actions>
-                <div class="d-flex flex-column align-items-end gap-2">
-                  <ActionButtons
-                    @view="apriVisualizza(mov)"
-                    @edit="apriModifica(mov)"
-                    @split="apriDividi(mov)"
-                  />
-                </div>
-              </template>
-            </MovimentoInfo>
-          </div>
+      <div v-else class="list-group list-group-flush">
+        <!-- NOTA: Qui uso il tuo componente MovimentoInfo -->
+        <div v-for="mov in movimenti" :key="mov.id" class="list-group-item p-3 border-light border-3">
+          <MovimentoInfo
+            :movimento="mov"
+            :expanded="expandedRows.has(mov.id)"
+            date-variant="long"
+            amount-mode="raw"
+            :show-tags="true"
+            :show-attachments="true"
+            @toggle="toggleExpand(mov.id)"
+          >
+            <!-- Slot per i bottoni azioni -->
+            <template #actions>
+              <div class="d-flex flex-column align-items-end gap-2">
+                <ActionButtons
+                  @view="apriVisualizza(mov)"
+                  @edit="apriModifica(mov)"
+                  @split="apriDividi(mov)"
+                />
+              </div>
+            </template>
+          </MovimentoInfo>
         </div>
+      </div>
     </div>
 
+    <!-- Modale Dettaglio (gestisce le azioni reali) -->
     <DettaglioMovimento ref="refDettaglio" @refresh="cerca" />
 
   </div>
@@ -322,7 +322,6 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
 .small-date { font-size: 0.8rem; outline: none; }
-.badge-tag-yellow { background-color: #fef9c3; border-color: #fde047 !important; color: #854d0e !important; }
 .cursor-pointer { cursor: pointer; }
 .transition-all { transition: all 0.2s ease; }
 </style>

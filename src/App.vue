@@ -93,7 +93,7 @@ onMounted(() => {
   <div class="bg-blob"></div>
 
   <!-- NAVBAR DESKTOP -->
-  <nav class="navbar d-none d-lg-block navbar-expand-lg glass-nav mb-4">
+  <nav class="navbar d-none d-lg-block navbar-expand-lg glass-nav mb-2">
     <div class="container">
       <a class="navbar-brand fw-bold" href="#" style="color: var(--primary-dark);">
         <i class="bi bi-wallet-fill me-2"></i>S.S. Finance

@@ -177,7 +177,7 @@ onMounted(() => {
     </div>
 
     <!-- 4. LISTA RECENTI -->
-    <h5 class="fw-bold mb-3 px-1">Recenti</h5>
+    <h5 class="fw-bold mb-3 px-1 border-2">Recenti</h5>
 
     <div v-if="caricamento" class="text-center py-5">
       <div class="spinner-border text-primary" role="status"></div>

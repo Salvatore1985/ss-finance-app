@@ -5,60 +5,83 @@ import { Modal } from 'bootstrap'
 
 const emit = defineEmits(['saved'])
 const salvataggio = ref(false)
-const availableTags = ref([]) // Lista di tutti i tag disponibili nel sistema
-const availableAccounts = ref([])
-const availableCategories = ref([])
+
+// Liste dinamiche dal DB
+const listaConti = ref([])
+const listaCategorie = ref([])
+const listaTag = ref([])
 
 const form = ref({
   importo: '',
   descrizione: '',
-  tipo: '',
+  tipo: 'Uscita',
   data: new Date().toISOString().split('T')[0],
-  conto: '',     
-  categoria: '',   
-  tags: []               // <--- ORA È UN ARRAY VUOTO
+  conto: '', // Vuoto all'inizio, obblighiamo a scegliere
+  categoria: '',
+  tags: [],
+  note: '',
+  file: null
 })
 
-// Carichiamo la lista dei Tag dal DB all'avvio
+// --- CARICAMENTO DATI DAL DB ---
 onMounted(async () => {
-  const [{ data: tags }, { data: conti }, { data: categorie }] = await Promise.all([
-    supabase.from('tags').select('*').order('nome'),
-    supabase.from('conti').select('nome').order('nome'),
-    supabase.from('categorie').select('nome').order('nome')
-  ])
+  // 1. Conti
+  const { data: c } = await supabase.from('conti').select('nome').order('nome')
+  if (c) listaConti.value = c
 
-  if (tags) availableTags.value = tags
-  if (conti) {
-    availableAccounts.value = conti
-    if (!form.value.conto && conti.length > 0) form.value.conto = conti[0].nome
-  }
-  if (categorie) {
-    availableCategories.value = categorie
-    if (!form.value.categoria && categorie.length > 0) form.value.categoria = categorie[0].nome
-  }
+  // 2. Categorie
+  const { data: cat } = await supabase.from('categorie').select('nome').order('nome')
+  if (cat) listaCategorie.value = cat
+
+  // 3. Tag
+  const { data: t } = await supabase.from('tags').select('nome').order('nome')
+  if (t) listaTag.value = t
+
+  // Default intelligenti (se ci sono dati)
+  if (listaConti.value.length > 0) form.value.conto = listaConti.value[0].nome
+  if (listaCategorie.value.length > 0) form.value.categoria = listaCategorie.value[0].nome
 })
 
-// Aggiunge un tag alla lista (se non c'è già)
 const aggiungiTag = (event) => {
   const tagName = event.target.value
-  if (tagName && !form.value.tags.includes(tagName)) {
-    form.value.tags.push(tagName)
-  }
-  event.target.value = "" // Resetta la select
+  if (tagName && !form.value.tags.includes(tagName)) form.value.tags.push(tagName)
+  event.target.value = ""
 }
 
-// Rimuove un tag cliccando la X
-const rimuoviTag = (index) => {
-  form.value.tags.splice(index, 1)
-}
+const rimuoviTag = (index) => form.value.tags.splice(index, 1)
+
+const handleFile = (e) => form.value.file = e.target.files[0]
 
 const salva = async () => {
-  if (!form.value.importo || !form.value.descrizione) return alert("Compila importo e descrizione!")
+  if (!form.value.importo || !form.value.descrizione) return alert("Compila i campi obbligatori!")
 
   try {
     salvataggio.value = true
     const { data: { user } } = await supabase.auth.getUser()
+   let fileUrl = null
+   
+    // 1. Upload File (Se c'è)
+    if (form.value.file) {
+      // PULIZIA NOME FILE: Tolgo spazi e caratteri strani
+      const nomeOriginalePulito = form.value.file.name.replace(/[^a-zA-Z0-9.]/g, '_')
+      const nomeFile = `${Date.now()}_${nomeOriginalePulito}`
+      
+      // Upload nel bucket 'ricevute'
+      const { error: uploadErr } = await supabase.storage
+        .from('ricevute') // <--- Assicurati che questo bucket esista su Supabase!
+        .upload(`${user.id}/${nomeFile}`, form.value.file)
+      
+      if (uploadErr) throw uploadErr
+      
+      // Ottieni URL pubblico
+      const { data: publicUrl } = supabase.storage
+        .from('ricevute')
+        .getPublicUrl(`${user.id}/${nomeFile}`)
+        
+      fileUrl = publicUrl.publicUrl
+    }
 
+    // Insert DB
     const { error } = await supabase.from('transazioni').insert([
       {
         user_id: user.id,
@@ -68,27 +91,28 @@ const salva = async () => {
         data: form.value.data,
         categoria: form.value.categoria,
         conto: form.value.conto,
-        tags: form.value.tags, // <--- SALVIAMO L'ARRAY
-        stato: 'confermato'
+        tags: form.value.tags,
+        note: form.value.note,
+        file_url: fileUrl,
+        stato: 'confermato',
+        is_manual: true
       }
     ])
 
     if (error) throw error
 
-    // Reset e Chiusura
-    form.value.descrizione = ''
-    form.value.importo = ''
-    form.value.tags = []
-    
+    // Chiusura
     const modalElement = document.getElementById('modalNuovo')
     const modalInstance = Modal.getOrCreateInstance(modalElement)
     modalInstance.hide()
-
-    const backdrop = document.querySelector('.modal-backdrop')
-    if (backdrop) backdrop.remove()
-    document.body.classList.remove('modal-open')
-    document.body.style = ''
-
+    
+    // Reset Form (Mantenendo i default caricati)
+    form.value.importo = ''
+    form.value.descrizione = ''
+    form.value.tags = []
+    form.value.note = ''
+    form.value.file = null
+    
     emit('saved')
 
   } catch (error) {
@@ -104,31 +128,28 @@ const salva = async () => {
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content border-0 shadow-lg p-3" style="border-radius: 20px;">
         
-        <div class="modal-header border-0">
+        <div class="modal-header border-0 pb-0">
           <h5 class="modal-title fw-bold">Nuovo Movimento</h5>
           <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
         </div>
 
-        <div class="modal-body">
+        <div class="modal-body pt-2">
           <form @submit.prevent="salva">
             
-            <!-- Importo -->
-            <div class="mb-4">
-              <label class="small fw-bold text-muted mb-1">Importo</label>
+            <div class="mb-3">
               <div class="input-group input-group-lg border rounded-3 overflow-hidden">
                 <span class="input-group-text bg-white border-0 text-muted ps-3">€</span>
-                <input v-model="form.importo" type="number" step="0.01" class="form-control border-0 fw-bold fs-1" placeholder="0.00" style="height: 70px;">
+                <input v-model="form.importo" type="number" step="0.01" class="form-control border-0 fw-bold fs-1" placeholder="0.00" required>
               </div>
             </div>
 
-            <!-- Data e Tipo -->
-            <div class="row g-3 mb-3">
+            <div class="mb-3">
+              <input v-model="form.descrizione" type="text" class="form-control fw-bold" placeholder="Descrizione (es. Pizza)" required>
+            </div>
+
+            <div class="row g-2 mb-3">
+              <div class="col-6"><input v-model="form.data" type="date" class="form-control"></div>
               <div class="col-6">
-                <label class="small fw-bold text-muted mb-1">Data</label>
-                <input v-model="form.data" type="date" class="form-control">
-              </div>
-              <div class="col-6">
-                <label class="small fw-bold text-muted mb-1">Tipo</label>
                 <select v-model="form.tipo" class="form-select">
                   <option value="Uscita">Uscita</option>
                   <option value="Entrata">Entrata</option>
@@ -136,55 +157,45 @@ const salva = async () => {
               </div>
             </div>
 
-            <!-- Descrizione -->
-            <div class="mb-3">
-              <label class="small fw-bold text-muted mb-1">Descrizione</label>
-              <input v-model="form.descrizione" type="text" class="form-control" placeholder="Spesa...">
-            </div>
-
-            <!-- Conto e Categoria (Semplificati per ora) -->
-            <div class="row g-3 mb-3">
+            <!-- SELECT DINAMICHE -->
+            <div class="row g-2 mb-3">
               <div class="col-6">
-                <label class="small fw-bold text-muted mb-1">Conto</label>
+                <label class="small text-muted mb-1">Conto</label>
                 <select v-model="form.conto" class="form-select">
-                   <option v-for="c in availableAccounts" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                   <option v-for="c in listaConti" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
                 </select>
               </div>
               <div class="col-6">
-                <label class="small fw-bold text-muted mb-1">Categoria</label>
+                <label class="small text-muted mb-1">Categoria</label>
                 <select v-model="form.categoria" class="form-select">
-                   <option v-for="c in availableCategories" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+                   <option v-for="c in listaCategorie" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
                 </select>
               </div>
             </div>
 
-            <!-- NUOVO SISTEMA TAG MULTIPLI -->
-            <div class="mb-4">
-               <label class="small fw-bold text-muted mb-1">Tag (Opzionali)</label>
-               <div class="border rounded-3 p-2 bg-light">
-                 
-                 <!-- Lista dei tag selezionati (Pillole) -->
-                 <div class="d-flex flex-wrap gap-2 mb-2" v-if="form.tags.length > 0">
-                   <span 
-                      v-for="(tag, index) in form.tags" 
-                      :key="tag" 
-                      class="badge bg-warning text-dark border border-warning rounded-pill d-flex align-items-center px-3"
-                   >
-                     #{{ tag }}
-                     <i class="bi bi-x-circle-fill ms-2 cursor-pointer text-black-50" @click="rimuoviTag(index)"></i>
-                   </span>
-                 </div>
-
-                 <!-- Select per aggiungere nuovo tag -->
-                 <select class="form-select form-select-sm border-0 bg-transparent text-muted" @change="aggiungiTag">
-                   <option value="" selected>+ Aggiungi Tag...</option>
-                   <option v-for="t in availableTags" :key="t.id" :value="t.nome">{{ t.nome }}</option>
+            <!-- TAG DINAMICI -->
+            <div class="mb-3">
+               <div class="border rounded-3 p-2 bg-light d-flex flex-wrap gap-2 align-items-center">
+                 <span v-for="(t, i) in form.tags" :key="i" class="badge bg-warning text-dark rounded-pill">
+                   #{{ t }} <i class="bi bi-x ms-1 cursor-pointer" @click="rimuoviTag(i)"></i>
+                 </span>
+                 <select class="form-select form-select-sm border-0 bg-transparent w-auto" @change="aggiungiTag">
+                   <option value="" selected>+ Tag</option>
+                   <option v-for="t in listaTag" :key="t.nome" :value="t.nome">{{ t.nome }}</option>
                  </select>
-
                </div>
             </div>
 
+            <div class="mb-3">
+              <textarea v-model="form.note" class="form-control" rows="2" placeholder="Note aggiuntive..."></textarea>
+            </div>
+
+            <div class="mb-4">
+              <input type="file" @change="handleFile" class="form-control form-control-sm text-muted">
+            </div>
+
             <button type="submit" class="btn btn-primary w-100 py-3 fw-bold shadow-sm rounded-3">
+              <span v-if="salvataggio" class="spinner-border spinner-border-sm me-2"></span>
               Salva
             </button>
 
@@ -194,7 +205,3 @@ const salva = async () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.cursor-pointer { cursor: pointer; }
-</style>
