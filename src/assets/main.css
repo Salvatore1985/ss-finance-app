@@ -57,7 +57,8 @@ body {
   background-color: var(--bg-body);
   color: var(--text-main);
   /* Spazio sotto per il menu mobile, spazio sopra per il menu desktop */
-  padding-bottom: 80px; 
+   padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+
 }
 
 /* Sfondo Blob */
@@ -116,7 +117,7 @@ body {
   display: flex;
   justify-content: space-around; /* Distanzia gli elementi */
   align-items: flex-end; /* Allinea in basso */
-  padding: 10px 15px 15px 15px; /* Più spazio sotto per gli iPhone recenti */
+  padding: 10px 15px calc(15px + env(safe-area-inset-bottom, 0px)) 15px; /* Più spazio sotto per gli iPhone recenti */
   z-index: 1000;
   border-top: 1px solid #f1f5f9;
 }
@@ -136,6 +137,23 @@ body {
 .nav-item i { font-size: 1.4rem; margin-bottom: 4px; transition: transform 0.2s; }
 .nav-item.active { color: var(--primary); }
 .nav-item.active i { transform: translateY(-2px); }
+
+/* Spaziatura contenuto rispetto alla bottom bar su schermi piccoli */
+.main-container {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+@media (min-width: 992px) {
+  body {
+    padding-bottom: 0;
+  }
+
+  .main-container {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
 
 /* FAB Mobile (Bottone Centrale) */
 .nav-item-fab {

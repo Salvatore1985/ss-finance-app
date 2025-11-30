@@ -45,12 +45,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="d-flex flex-column h-100 container py-3" style="max-height: calc(90vh - 80px);">
+  <div class="movimenti-page container py-3 d-flex flex-column min-vh-100">
     <div class="d-flex justify-content-between align-items-center mb-4">
       <h4 class="fw-bold m-0">Movimenti</h4>
       <span class="badge bg-light text-muted border">{{ movimenti.length }} transazioni</span>
     </div>
-    <div class="flex-grow-1 overflow-auto rounded-3 border bg-white shadow-sm position-relative">
+    <div class="movimenti-scroll flex-grow-1 rounded-3 border bg-white shadow-sm position-relative">
       <div v-if="caricamento" class="text-center py-5">
         <div class="spinner-border text-primary" role="status"></div>
       </div>
@@ -62,7 +62,7 @@ onMounted(() => {
           <div
             v-for="mov in movimenti"
             :key="mov.id"
-            class="list-group-item py-3 border-light border-3"
+            class="list-group-item py-3 border-light"
           >
             <MovimentoInfo
               :movimento="mov"
@@ -92,3 +92,24 @@ onMounted(() => {
   </div>
 </template>
 
+<style scoped>
+.movimenti-page {
+  max-height: none;
+  min-height: 100vh;
+}
+
+.movimenti-scroll {
+  overflow: visible;
+  min-height: 0;
+}
+
+@media (min-width: 992px) {
+  .movimenti-page {
+    max-height: calc(100vh - 160px);
+  }
+
+  .movimenti-scroll {
+    overflow: auto;
+  }
+}
+</style>

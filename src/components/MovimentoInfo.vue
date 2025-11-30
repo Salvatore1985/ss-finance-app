@@ -52,69 +52,73 @@ const formattedDate = computed(() => {
 </script>
 
 <template>
-  <div class="d-flex align-items-start gap-3 w-100">
-    
-    <!-- 1. ICONA TONDA (SX) -->
-    <div class="movement-icon shadow-sm flex-shrink-0" :class="iconWrapperClass">
-      <i class="bi fs-5" :class="iconClass"></i>
-    </div>
+  <div class="movimento-card d-flex flex-column gap-3 w-100">
 
-    <!-- 2. CORPO CENTRALE -->
-    <div class="flex-grow-1 min-width-0">
-      
-      <div class="d-flex justify-content-between align-items-start">
-        
-        <!-- Descrizione e Data -->
-        <div class="me-2">
-          <div
-            class="fw-bold text-dark text-break"
-            :class="{ 'text-truncate': !expanded, 'cursor-pointer': !!$attrs.onToggle }"
-            @click="emit('toggle')"
-            style="max-width: 100%;"
-          >
-            {{ movimento.descrizione }}
+    <div class="d-flex align-items-start flex-wrap gap-3 w-100">
+
+      <!-- Barra azioni: sopra su mobile, laterale su desktop -->
+      <div v-if="$slots.actions" class="actions-row d-flex gap-2">
+        <slot name="actions" />
+      </div>
+
+      <!-- 1. ICONA TONDA (SX) -->
+      <div class="movement-icon shadow-sm flex-shrink-0" :class="iconWrapperClass">
+        <i class="bi fs-5" :class="iconClass"></i>
+      </div>
+
+      <!-- 2. CORPO CENTRALE -->
+      <div class="flex-grow-1 min-width-0">
+
+        <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+
+          <!-- Descrizione e Data -->
+          <div class="me-2">
+            <div
+              class="fw-bold text-dark text-break"
+              :class="{ 'text-truncate': !expanded, 'cursor-pointer': !!$attrs.onToggle }"
+              @click="emit('toggle')"
+              style="max-width: 100%;"
+            >
+              {{ movimento.descrizione }}
+            </div>
+
+            <!-- Data piccola sotto la descrizione -->
+            <div class="small text-muted mt-1 d-flex align-items-center">
+              <i class="bi bi-calendar-event me-1" style="font-size: 0.7rem;"></i>
+              {{ formattedDate }}
+            </div>
           </div>
-          
-          <!-- Data piccola sotto la descrizione -->
-          <div class="small text-muted mt-1 d-flex align-items-center">
-            <i class="bi bi-calendar-event me-1" style="font-size: 0.7rem;"></i>
-            {{ formattedDate }}
+
+          <!-- Importo (DX Mobile) -->
+          <div class="text-end">
+            <div class="fw-bold text-nowrap fs-6" :class="amountClass">
+              {{ formattedAmount }} €
+            </div>
           </div>
         </div>
 
-        <!-- Importo (DX Mobile) -->
-        <div class="text-end">
-          <div class="fw-bold text-nowrap fs-6" :class="amountClass">
-            {{ formattedAmount }} €
-          </div>
+        <!-- Badge Categoria e Conto -->
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-2">
+          <span class="badge badge-soft border">
+            <i class="bi bi-bank2 me-1 text-muted"></i> {{ movimento.conto }}
+          </span>
+          <span class="badge badge-soft border">
+            {{ movimento.categoria }}
+          </span>
+
+          <!-- Icone Extra (Note/Allegati) -->
+          <i v-if="showAttachments && movimento.note" class="bi bi-sticky-fill text-warning ms-1" title="Note"></i>
+          <i v-if="showAttachments && movimento.file_url" class="bi bi-paperclip text-secondary ms-1" title="Allegato"></i>
+        </div>
+
+        <!-- Tag (Pillole Gialle) -->
+        <div v-if="showTags && movimento.tags?.length" class="d-flex flex-wrap gap-1 mt-2">
+          <span v-for="tag in movimento.tags" :key="tag" class="badge badge-tag text-dark border">
+            <i class="bi bi-tag-fill me-1 opacity-50"></i> {{ tag }}
+          </span>
         </div>
       </div>
 
-      <!-- Badge Categoria e Conto -->
-      <div class="d-flex align-items-center flex-wrap gap-2 mt-2">
-        <span class="badge badge-soft border">
-          <i class="bi bi-bank2 me-1 text-muted"></i> {{ movimento.conto }}
-        </span>
-        <span class="badge badge-soft border">
-          {{ movimento.categoria }}
-        </span>
-        
-        <!-- Icone Extra (Note/Allegati) -->
-        <i v-if="showAttachments && movimento.note" class="bi bi-sticky-fill text-warning ms-1" title="Note"></i>
-        <i v-if="showAttachments && movimento.file_url" class="bi bi-paperclip text-secondary ms-1" title="Allegato"></i>
-      </div>
-
-      <!-- Tag (Pillole Gialle) -->
-      <div v-if="showTags && movimento.tags?.length" class="d-flex flex-wrap gap-1 mt-2">
-        <span v-for="tag in movimento.tags" :key="tag" class="badge badge-tag text-dark border">
-          <i class="bi bi-tag-fill me-1 opacity-50"></i> {{ tag }}
-        </span>
-      </div>
-    </div>
-
-    <!-- 3. SLOT AZIONI (Bottoni laterali) -->
-    <div v-if="$slots.actions" class="d-flex align-items-center align-self-center ms-2">
-      <slot name="actions" />
     </div>
 
   </div>
@@ -157,4 +161,24 @@ const formattedDate = computed(() => {
 .min-width-0 {
   min-width: 0; /* Fondamentale per far funzionare text-truncate in flexbox */
 }
+
+.movimento-card {
+  background: #fff;
+}
+
+.actions-row {
+  order: 0;
+  width: 100%;
+  justify-content: flex-start;
+}
+
+@media (min-width: 992px) {
+  .actions-row {
+    order: 2;
+    width: auto;
+    justify-content: flex-end;
+    align-self: flex-start;
+  }
+}
 </style>
+

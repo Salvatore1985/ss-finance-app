@@ -171,7 +171,7 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
 </script>
 
 <template>
-  <div class="d-flex flex-column h-100 container py-1" style="max-height: calc(100vh - 80px);">
+  <div class="storico-page d-flex flex-column min-vh-100 container py-1">
     
     <!-- === SEZIONE FILTRI FISSA === -->
     <div class="flex-shrink-0 mb-2">
@@ -227,19 +227,19 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
         </div>
 
         <!-- 3. SELECT FILTRI (Conto, Cat) -->
-        <div class="d-flex gap-2 mb-2">
-          <select v-model="filters.tipo" class="form-select form-select-sm" style="width: auto;">
-            <option>Tutti</option><option>Uscita</option><option>Entrata</option>
-          </select>
-          <select v-model="filters.conto" class="form-select form-select-sm">
-            <option value="">Tutti i Conti</option>
-            <option v-for="c in options.conti" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
-          </select>
-          <select v-model="filters.categoria" class="form-select form-select-sm">
-            <option value="">Tutte le Cat.</option>
-            <option v-for="c in options.categorie" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
-          </select>
-        </div>
+           <div class="d-flex flex-column flex-lg-row gap-2 mb-2">
+            <select v-model="filters.tipo" class="form-select form-select-sm flex-lg-grow-0" style="width: auto;">
+              <option>Tutti</option><option>Uscita</option><option>Entrata</option>
+            </select>
+            <select v-model="filters.conto" class="form-select form-select-sm flex-grow-1">
+              <option value="">Tutti i Conti</option>
+              <option v-for="c in options.conti" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+            </select>
+            <select v-model="filters.categoria" class="form-select form-select-sm flex-grow-1">
+              <option value="">Tutte le Cat.</option>
+              <option v-for="c in options.categorie" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+            </select>
+          </div>
 
         <!-- 4. SELETTORI TAG (SCORREVOLI) -->
         <div v-if="options.tags.length > 0" class="border-top pt-2 mt-2">
@@ -273,7 +273,7 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
     </div>
 
     <!-- === LISTA SCORREVOLE === -->
-    <div class="flex-grow-1 overflow-auto rounded-3 border bg-white shadow-sm position-relative">
+    <div class="storico-scroll flex-grow-1 rounded-3 border bg-white shadow-sm position-relative">
       
       <div v-if="loading" class="position-absolute top-50 start-50 translate-middle">
         <div class="spinner-border text-primary"></div>
@@ -324,4 +324,24 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
 .small-date { font-size: 0.8rem; outline: none; }
 .cursor-pointer { cursor: pointer; }
 .transition-all { transition: all 0.2s ease; }
+
+.storico-page {
+  max-height: none;
+  min-height: 100vh;
+}
+
+.storico-scroll {
+  overflow: visible;
+  min-height: 0;
+}
+
+@media (min-width: 992px) {
+  .storico-page {
+    max-height: calc(100vh - 140px);
+  }
+
+  .storico-scroll {
+    overflow: auto;
+  }
+}
 </style>
