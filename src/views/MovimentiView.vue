@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { supabase } from '../supabase'
 import DettaglioMovimento from '../components/DettaglioMovimento.vue'
 import ActionButtons from '../components/ActionButtons.vue'
+import MovimentoInfo from '../components/MovimentoInfo.vue'
 const movimenti = ref([])
 const caricamento = ref(true)
 const refDettaglio = ref(null)
@@ -58,41 +59,24 @@ onMounted(() => {
       <div class="list-group list-group-flush">
         
         <!-- NOTA: Ho tolto @click dalla riga intera -->
-        <div 
-          v-for="mov in movimenti" 
-          :key="mov.id" 
-          class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-center py-3 border-light gap-3"
+        <div
+          v-for="mov in movimenti"
+          :key="mov.id"
+          class="list-group-item py-3 border-light"
         >
-          
-          <!-- PARTE SINISTRA (Icona e Testo) -->
-          <div class="d-flex align-items-center w-100">
-            <div class="rounded-circle bg-light p-2 me-3 d-flex justify-content-center align-items-center shadow-sm" style="width: 45px; height: 45px; flex-shrink: 0;">
-              <i class="bi fs-5" 
-                 :class="mov.tipo === 'Entrata' ? 'bi-piggy-bank-fill text-success' : 'bi-bag-fill text-primary'">
-              </i>
-            </div>
-            
-            <div class="flex-grow-1 min-width-0"> <!-- min-width-0 serve per il text-truncate -->
-              <div class="d-flex justify-content-between align-items-center">
-                <div class="fw-bold text-dark text-truncate pe-2">{{ mov.descrizione }}</div>
-                <!-- Importo visibile subito -->
-                <div class="fw-bold text-nowrap" :class="mov.tipo === 'Uscita' ? 'text-dark' : 'text-success'">
-                  {{ mov.tipo === 'Uscita' ? '-' : '+' }} {{ parseFloat(mov.importo).toFixed(2) }} €
-                </div>
-              </div>
-              
-              <div class="small text-muted d-flex align-items-center gap-2 mt-1">
-                <span class="badge bg-secondary bg-opacity-10 text-secondary border fw-medium" style="font-size: 0.7rem;">{{ mov.categoria }}</span>
-                <span>{{ new Date(mov.data).toLocaleDateString('it-IT', { day: '2-digit', month: 'short' }) }}</span>
-              </div>
-            </div>
-          </div>
-
-            <ActionButtons
-            @view="vediDettaglio(mov)"
-            @edit="modificaMovimento(mov)"
-            @split="dividiMovimento(mov)"
-          />      
+          <MovimentoInfo
+            :movimento="mov"
+            :show-tags="false"
+            :show-attachments="false"
+          >
+            <template #actions>
+              <ActionButtons
+                @view="vediDettaglio(mov)"
+                @edit="modificaMovimento(mov)"
+                @split="dividiMovimento(mov)"
+              />
+            </template>
+          </MovimentoInfo>
         </div>
       </div>
       

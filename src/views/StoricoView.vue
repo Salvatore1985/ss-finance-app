@@ -3,6 +3,7 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { supabase } from '../supabase'
 import DettaglioMovimento from '../components/DettaglioMovimento.vue'
 import ActionButtons from '../components/ActionButtons.vue'
+import MovimentoInfo from '../components/MovimentoInfo.vue'
 
 // --- STATO ---
 const loading = ref(false)
@@ -286,55 +287,29 @@ const apriDividi = (mov) => { if (refDettaglio.value) refDettaglio.value.apri(mo
         Nessun movimento trovato.
       </div>
 
-      <div v-else class="list-group list-group-flush">
-        <div v-for="mov in movimenti" :key="mov.id" class="list-group-item p-3 border-light">
-          
-          <div class="d-flex justify-content-between align-items-start mb-2">
-            <div class="d-flex align-items-start gap-3 w-100">
-              <div class="rounded-circle p-2 d-flex align-items-center justify-content-center shadow-sm flex-shrink-0"
-                   :class="mov.tipo === 'Entrata' ? 'bg-success bg-opacity-10 text-success' : 'bg-primary bg-opacity-10 text-primary'"
-                   style="width: 40px; height: 40px;">
-                <i class="bi fs-5" :class="mov.tipo === 'Entrata' ? 'bi-arrow-down' : 'bi-bag'"></i>
-              </div>
-
-              <div class="w-100 min-width-0">
-                <div 
-                  class="fw-bold text-dark mb-1 cursor-pointer text-break"
-                  :class="{ 'text-truncate': !expandedRows.has(mov.id) }"
-                  @click="toggleExpand(mov.id)"
-                >
-                  {{ mov.descrizione }}
+        <div v-else class="list-group list-group-flush">
+          <div v-for="mov in movimenti" :key="mov.id" class="list-group-item p-3 border-light">
+            <MovimentoInfo
+              :movimento="mov"
+              :expanded="expandedRows.has(mov.id)"
+              date-variant="long"
+              amount-mode="raw"
+              :show-tags="true"
+              :show-attachments="true"
+              @toggle="toggleExpand(mov.id)"
+            >
+              <template #actions>
+                <div class="d-flex flex-column align-items-end gap-2">
+                  <ActionButtons
+                    @view="apriVisualizza(mov)"
+                    @edit="apriModifica(mov)"
+                    @split="apriDividi(mov)"
+                  />
                 </div>
-                
-                <div class="small text-muted mb-2">
-                  {{ new Date(mov.data).toLocaleDateString('it-IT', { weekday: 'short', day: '2-digit', month: 'long' }) }}
-                </div>
-
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                  <i v-if="mov.note" class="bi bi-sticky-fill text-warning"></i>
-                  <i v-if="mov.file_url" class="bi bi-paperclip text-secondary"></i>
-                  <span class="badge bg-light text-dark border">{{ mov.conto }}</span>
-                  <span class="badge bg-light text-dark border">{{ mov.categoria }}</span>
-                  <span v-for="t in mov.tags" :key="t" class="badge badge-tag-yellow text-dark border">
-                    <i class="bi bi-tag-fill me-1" style="font-size: 0.6rem;"></i> {{ t }}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div class="text-end d-flex flex-column align-items-end ps-2">
-              <div class="fw-bold mb-2 text-nowrap fs-6" :class="mov.tipo === 'Uscita' ? 'text-dark' : 'text-success'">
-                {{ mov.importo }} €
-              </div>
-              <ActionButtons
-                @view="apriVisualizza(mov)"
-                @edit="apriModifica(mov)"
-                @split="apriDividi(mov)"
-              />
-            </div>
+              </template>
+            </MovimentoInfo>
           </div>
         </div>
-      </div>
     </div>
 
     <DettaglioMovimento ref="refDettaglio" @refresh="cerca" />

@@ -143,20 +143,20 @@ const salva = async () => {
             </div>
 
             <!-- Conto e Categoria (Semplificati per ora) -->
-            <div class="row g-3 mb-3">␊
-              <div class="col-6">␊
-                <label class="small fw-bold text-muted mb-1">Conto</label>␊
-                <select v-model="form.conto" class="form-select">␊
+            <div class="row g-3 mb-3">
+              <div class="col-6">
+                <label class="small fw-bold text-muted mb-1">Conto</label>
+                <select v-model="form.conto" class="form-select">
                    <option v-for="c in availableAccounts" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
-                </select>␊
-              </div>␊
-              <div class="col-6">␊
-                <label class="small fw-bold text-muted mb-1">Categoria</label>␊
-                <select v-model="form.categoria" class="form-select">␊
+                </select>
+              </div>
+              <div class="col-6">
+                <label class="small fw-bold text-muted mb-1">Categoria</label>
+                <select v-model="form.categoria" class="form-select">
                    <option v-for="c in availableCategories" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
-                </select>␊
-              </div>␊
-            </div>␊
+                </select>
+              </div>
+            </div>
 
             <!-- NUOVO SISTEMA TAG MULTIPLI -->
             <div class="mb-4">

@@ -28,13 +28,51 @@ onMounted(async () => {
   if (categorie) availableCategories.value = categorie
 })
 
+
+
+function parseAmountInput (value) {
+  if (value === null || value === undefined || value === '') return NaN
+
+  const stringValue = typeof value === 'string' ? value : String(value)
+  const normalizzato = stringValue.replace(',', '.').trim()
+
+  return parseFloat(normalizzato)
+}
+
+function normalizeSplitAmount (value) {
+  if (value === null || value === undefined || value === '') return NaN
+
+  const stringValue = typeof value === 'string' ? value : String(value)
+  const normalizzato = stringValue.replace(',', '.').trim()
+
+  return parseFloat(normalizzato)
+}
+
+async function resolveUserId (baseUserId) {
+  if (baseUserId) return baseUserId
+
+  const [{ data: userData, error: userError }, { data: sessionData, error: sessionError }] = await Promise.all([
+    supabase.auth.getUser(),
+    supabase.auth.getSession()
+  ])
+
+  if (userError) console.error('Errore getUser:', userError)
+  if (sessionError) console.error('Errore getSession:', sessionError)
+
+  return userData?.user?.id || sessionData?.session?.user?.id || null
+}
+
 const splitRimanente = computed(() => {
   if (!movimento.value) return 0
-  const tot = parseFloat(movimento.value.importo)
-  const part = parseFloat(splitForm.value.amount) || 0
-  return (tot - part).toFixed(2)
-})
 
+  const totale = parseFloat(movimento.value.importo)
+  const totaleAssoluto = Math.abs(totale)
+  const quota = Math.abs(normalizeSplitAmount(splitForm.value.amount)) || 0
+  const rimanenteAssoluto = Math.max(totaleAssoluto - quota, 0)
+  const segno = totale >= 0 ? 1 : -1
+
+  return (rimanenteAssoluto * segno).toFixed(2)
+})
 const apri = (mov, modalitaIniziale = 'view') => {
   movimento.value = mov
   mode.value = modalitaIniziale
@@ -106,14 +144,15 @@ const eseguiSplit = async () => {
   if (!movimento.value) return
 
   const totale = parseFloat(movimento.value.importo)
-  const quota = parseFloat(splitForm.value.amount)
+  const totaleAssoluto = Math.abs(totale)
+  const quota = Math.abs(normalizeSplitAmount(splitForm.value.amount))
 
   if (Number.isNaN(quota) || quota <= 0) {
     alert('Inserisci un importo valido per la quota da dividere')
     return
   }
 
-  if (quota >= totale) {
+  if (quota >= totaleAssoluto) {
     alert('L\'importo da dividere deve essere inferiore al totale del movimento')
     return
   }
@@ -126,17 +165,25 @@ const eseguiSplit = async () => {
   try {
     loading.value = true
 
-    const restante = parseFloat((totale - quota).toFixed(2))
+    const segno = totale >= 0 ? 1 : -1
+    const restante = parseFloat((totaleAssoluto - quota).toFixed(2)) * segno
     const base = movimento.value
+    const userId = await resolveUserId(base.user_id)
+
+    if (!userId) {
+      alert('Impossibile determinare l\'utente corrente. Effettua di nuovo il login e riprova.')
+      return
+    }
 
     const { error: insertError } = await supabase.from('transazioni').insert({
       descrizione: splitForm.value.description?.trim() || `${base.descrizione} (split)`,
-      importo: quota,
+      importo: parseFloat((quota * segno).toFixed(2)),
       data: base.data,
       categoria: splitForm.value.category,
       conto: base.conto,
       tipo: base.tipo,
       tags: base.tags || [],
+      user_id: userId,
       is_manual: true
     })
 
@@ -146,7 +193,8 @@ const eseguiSplit = async () => {
       .from('transazioni')
       .update({ importo: restante, is_manual: true })
       .eq('id', base.id)
-
+      .eq('user_id', userId)
+      
     if (updateError) throw updateError
 
     chiudiEaggiorna()
