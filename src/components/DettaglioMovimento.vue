@@ -41,8 +41,12 @@ const apri = (mov, modalitaIniziale = 'view') => {
   
   // Clona i dati. IMPORTANTE: Se tags è null, usa array vuoto []
   editForm.value = { ...mov, tags: mov.tags || [] }
-  
-  splitForm.value = { amount: '', category: '' }
+
+  splitForm.value = {
+    amount: '',
+    category: mov.categoria || '',
+    description: `${mov.descrizione} (split)`
+  }
 
   const el = document.getElementById('modalDettaglio')
   const modal = new Modal(el)
@@ -99,9 +103,58 @@ const elimina = async () => {
 }
 
 const eseguiSplit = async () => {
-  // ... (Logica Split invariata, se vuoi possiamo mantenerla semplice per ora) ...
-  // Per brevità non la riscrivo tutta, è uguale a prima
-  alert("Funzione Split momentaneamente semplificata per test Tag")
+  if (!movimento.value) return
+
+  const totale = parseFloat(movimento.value.importo)
+  const quota = parseFloat(splitForm.value.amount)
+
+  if (Number.isNaN(quota) || quota <= 0) {
+    alert('Inserisci un importo valido per la quota da dividere')
+    return
+  }
+
+  if (quota >= totale) {
+    alert('L\'importo da dividere deve essere inferiore al totale del movimento')
+    return
+  }
+
+  if (!splitForm.value.category) {
+    alert('Seleziona una categoria per la nuova quota')
+    return
+  }
+
+  try {
+    loading.value = true
+
+    const restante = parseFloat((totale - quota).toFixed(2))
+    const base = movimento.value
+
+    const { error: insertError } = await supabase.from('transazioni').insert({
+      descrizione: splitForm.value.description?.trim() || `${base.descrizione} (split)`,
+      importo: quota,
+      data: base.data,
+      categoria: splitForm.value.category,
+      conto: base.conto,
+      tipo: base.tipo,
+      tags: base.tags || [],
+      is_manual: true
+    })
+
+    if (insertError) throw insertError
+
+    const { error: updateError } = await supabase
+      .from('transazioni')
+      .update({ importo: restante, is_manual: true })
+      .eq('id', base.id)
+
+    if (updateError) throw updateError
+
+    chiudiEaggiorna()
+  } catch (e) {
+    alert('Errore split: ' + e.message)
+  } finally {
+    loading.value = false
+  }
 }
 
 const chiudiEaggiorna = () => {
@@ -218,6 +271,60 @@ const chiudiEaggiorna = () => {
             <div class="d-flex gap-2">
               <button @click="mode='view'" class="btn btn-light w-100 fw-bold">Annulla</button>
               <button @click="salvaModifica" class="btn btn-primary w-100 fw-bold text-white">Salva</button>
+            </div>
+          </div>
+
+          <!-- SPLIT -->
+          <div v-if="mode === 'split'">
+            <h6 class="fw-bold mb-3 text-primary">Dividi movimento</h6>
+
+            <div class="alert alert-light border shadow-sm d-flex justify-content-between align-items-center">
+              <div>
+                <div class="text-muted small">Totale</div>
+                <div class="fw-bold">{{ parseFloat(movimento?.importo || 0).toFixed(2) }} €</div>
+              </div>
+              <div class="text-end">
+                <div class="text-muted small">Rimanente dopo split</div>
+                <div class="fw-bold">{{ splitRimanente }} €</div>
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="small fw-bold text-muted">Quota da spostare</label>
+              <input
+                v-model="splitForm.amount"
+                type="number"
+                step="0.01"
+                min="0"
+                class="form-control"
+                placeholder="0.00"
+              >
+            </div>
+
+            <div class="mb-3">
+              <label class="small fw-bold text-muted">Categoria per la nuova quota</label>
+              <select v-model="splitForm.category" class="form-select">
+                <option value="" disabled>Seleziona categoria</option>
+                <option v-for="c in availableCategories" :key="c.nome" :value="c.nome">{{ c.nome }}</option>
+              </select>
+            </div>
+
+            <div class="mb-4">
+              <label class="small fw-bold text-muted">Descrizione nuova quota</label>
+              <input
+                v-model="splitForm.description"
+                type="text"
+                class="form-control"
+                placeholder="Descrizione della parte divisa"
+              >
+            </div>
+
+            <div class="d-flex gap-2">
+              <button @click="mode='view'" class="btn btn-light w-100 fw-bold">Annulla</button>
+              <button @click="eseguiSplit" class="btn btn-primary w-100 fw-bold text-white" :disabled="loading">
+                <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+                Conferma split
+              </button>
             </div>
           </div>
 
