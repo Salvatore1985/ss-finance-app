@@ -70,6 +70,7 @@ const formattedTotale = computed(() => {
   width: 100%;
   padding: 8px 10px;
   display: flex;
+  
   flex-direction: column;
   gap: 4px;
 }*/

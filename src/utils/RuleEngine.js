@@ -1,37 +1,80 @@
-import { supabase } from '../supabase'
+// src/utils/RuleEngine.js (o percorso equivalente)
+import { supabase } from '@/supabase'
 
 /**
- * Prende una lista di movimenti e applica le regole salvate nel DB.
- * Ritorna la lista modificata con le categorie assegnate.
+ * Applica le regole ai movimenti caricati da BankParser.
+ *
+ * - NON tocca categoria_banca (resta il valore della banca)
+ * - Imposta categoria_id in base a regole.categoria_id
+ * - Imposta categoria (testo) usando la tabella categorie
  */
 export async function applicaRegole(movimenti) {
-  // 1. Scarica tutte le regole dal DB
-  const { data: regole, error } = await supabase.from('regole').select('*')
-  
-  if (error || !regole) {
-    console.error("Errore caricamento regole:", error)
-    return movimenti // Se fallisce, ritorna i movimenti originali
+  if (!movimenti || movimenti.length === 0) {
+    return movimenti || []
   }
 
-  // 2. Loop su ogni movimento
-  return movimenti.map(mov => {
-    // Se ha già una categoria valida dalla banca, saltiamo (o sovrascriviamo? Meglio sovrascrivere se c'è una regola esplicita)
-    
-    let nuovaCategoria = mov.categoria // Partiamo da quella che c'è (es. "Da Classificare" o quella della banca)
-    const descrizione = mov.descrizione.toLowerCase()
+  // 1. Carico tutte le regole utili
+  const { data: regole, error: errRegole } = await supabase
+    .from('regole')
+    .select('id, keyword, categoria_id')
 
-    // 3. Cerca match con le regole
-    for (const regola of regole) {
-      if (descrizione.includes(regola.keyword.toLowerCase())) {
-        nuovaCategoria = regola.categoria
-        break // Trovata una regola, ci fermiamo (vince la prima o la più specifica?)
+  if (errRegole) {
+    console.error('[Regole] Errore caricamento regole:', errRegole)
+    // in caso di errore, restituisco i movimenti così come sono
+    return movimenti
+  }
+
+  // 2. Carico il dizionario categorie (id -> nome)
+  const { data: categorie, error: errCat } = await supabase
+    .from('categorie')
+    .select('id, nome')
+
+  if (errCat) {
+    console.error('[Regole] Errore caricamento categorie:', errCat)
+    return movimenti
+  }
+
+  const catById = new Map(categorie.map(c => [c.id, c.nome]))
+
+  // 3. Per ogni movimento applico la prima regola che matcha
+  const result = movimenti.map(mov => {
+    // Se ha già categoria_id (magari messa a mano) non lo tocco
+    if (mov.categoria_id) {
+      const nomeCat = catById.get(mov.categoria_id) || mov.categoria || null
+      return {
+        ...mov,
+        categoria_id: mov.categoria_id,
+        categoria: nomeCat
       }
     }
 
-    // Ritorniamo il movimento con la categoria aggiornata
+    const descr = (mov.descrizione || '').toLowerCase()
+    const catBanca = (mov.categoria_banca || '').toLowerCase()
+    const target = `${descr} ${catBanca}`.trim()
+
+    let nuovaCategoriaId = null
+
+    for (const reg of regole) {
+      if (!reg.keyword) continue
+      const kw = reg.keyword.toLowerCase().trim()
+      if (!kw) continue
+
+      if (target.includes(kw)) {
+        nuovaCategoriaId = reg.categoria_id || null
+        break   // prima regola che matcha, ci fermiamo
+      }
+    }
+
+    const nomeCategoria = nuovaCategoriaId
+      ? (catById.get(nuovaCategoriaId) || mov.categoria || null)
+      : mov.categoria || null
+
     return {
       ...mov,
-      categoria: nuovaCategoria
+      categoria_id: nuovaCategoriaId,
+      categoria: nomeCategoria
     }
   })
+
+  return result
 }

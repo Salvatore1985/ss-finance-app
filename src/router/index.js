@@ -28,7 +28,9 @@ const router = createRouter({
       path: '/config',
       name: 'config',
       component: ConfigView
-    }
+    },
+   { path: '/importa', name: 'importa', component: () => import('../views/ImportaView.vue') }
+
   ]
 })
 

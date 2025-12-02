@@ -33,6 +33,7 @@
       <!-- VISTA (collega i bottoni al grafico centrale) -->
       <div class="sidebar-block">
         <div class="sidebar-label">Vista</div>
+
         <button
           class="sidebar-btn"
           :class="{ primary: selectedView === 'periodo' }"
@@ -40,6 +41,7 @@
         >
           Periodo
         </button>
+
         <button
           class="sidebar-btn"
           :class="{ primary: selectedView === 'conti' }"
@@ -47,6 +49,7 @@
         >
           Conti &amp; Banche
         </button>
+
         <button
           class="sidebar-btn"
           :class="{ primary: selectedView === 'tipo' }"
@@ -54,14 +57,25 @@
         >
           Tipo di analisi
         </button>
+
         <button
           class="sidebar-btn"
           :class="{ primary: selectedView === 'categorie' }"
           @click="setView('categorie')"
         >
-          Categorie / Tag
+          Categorie
+        </button>
+
+        <button
+          class="sidebar-btn"
+          :class="{ primary: selectedView === 'tag' }"
+          @click="setView('tag')"
+        >
+          Tag
         </button>
       </div>
+
+
 
       <!-- VISUALIZZAZIONE -->
       <div class="sidebar-block">
@@ -116,7 +130,7 @@
           :view="selectedView"
         />
         <div class="dash-box extra-box">
-          EXTRA
+          <DashboardExtra :active-user="activeUser" />
         </div>
       </section>
     </main>
@@ -128,6 +142,7 @@ import { ref } from 'vue'
 import DashboardKpis from '@/components/Dashboard/DashboardKpis.vue'
 import DashboardChart from '@/components/Dashboard/DashboardChart.vue'
 import DashboardList from '@/components/Dashboard/DashboardList.vue'
+import DashboardExtra from '@/components/Dashboard/DashboardExtra.vue'
 
 const activeUser = ref('all')          // 'all' | 'salvo' | 'sigi'
 const selectedView = ref('periodo')    // 'periodo' | 'conti' | 'tipo' | 'categorie'

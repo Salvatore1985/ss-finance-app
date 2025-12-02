@@ -1,49 +1,127 @@
 <template>
   <div class="list-box">
-    <!-- header -->
+    <!-- HEADER -->
     <div class="list-header">
-      <div class="list-title">Lista movimenti</div>
-      <div class="list-subtitle">
-        Utente: {{ activeUserLabel }}
+      <div>
+        <div class="list-title">Lista movimenti</div>
+        <div class="list-subtitle">
+          Utente: {{ activeUserLabel }}
+        </div>
       </div>
     </div>
 
-    <!-- loading -->
-    <div v-if="loading" class="list-body list-body-center">
+    <!-- LOADING -->
+    <div v-if="loading" class="list-body list-center">
       <div class="spinner-border text-primary" role="status"></div>
     </div>
 
-    <!-- nessun dato -->
-    <div v-else-if="!hasData" class="list-body list-body-center">
+    <!-- NESSUN DATO -->
+    <div
+      v-else-if="rows.length === 0"
+      class="list-body list-center"
+    >
       <p class="list-empty">Non ci sono movimenti da mostrare.</p>
     </div>
 
-    <!-- lista vera -->
+    <!-- LISTA -->
     <div v-else class="list-body">
-      <ul class="list">
-        <li
-          v-for="mov in movimenti"
-          :key="mov.id"
-          class="list-row"
+      <div class="mov-list">
+        <button
+          v-for="row in rows"
+          :key="row.id"
+          type="button"
+          class="mov-row"
+          @click="openDetail(row)"
         >
-          <div class="list-main">
-            <span class="list-date">{{ formatDate(mov.data) }}</span>
-            <span class="list-label">
-              {{ mov.tipo || 'Movimento' }}
-            </span>
+          <div class="mov-main">
+            <div class="mov-date">{{ formatDateShort(row.data) }}</div>
+            <div class="mov-desc">
+              {{ row.descrizione || 'Senza descrizione' }}
+            </div>
+            <div class="mov-meta">
+              <span v-if="row.categoria" class="mov-pill">
+                {{ row.categoria }}
+              </span>
+              <span v-if="row.conto" class="mov-pill alt">
+                {{ row.conto }}
+              </span>
+            </div>
           </div>
 
           <div
-            class="list-amount"
+            class="mov-amount"
             :class="{
-              positivo: mov.importo > 0,
-              negativo: mov.importo < 0
+              neg: isOut(row),
+              pos: isIn(row)
             }"
           >
-            {{ formatImporto(mov.importo) }}
+            {{ formatCurrency(row.importo) }}
           </div>
-        </li>
-      </ul>
+        </button>
+      </div>
+    </div>
+
+    <!-- MODALE DETTAGLIO -->
+    <div
+      v-if="showDetail && selected"
+      class="mov-modal-backdrop"
+      @click.self="closeDetail"
+    >
+      <div class="mov-modal">
+        <div class="mov-modal-header">
+          <div class="mov-modal-title">
+            Dettaglio movimento
+          </div>
+          <button
+            type="button"
+            class="btn-close"
+            aria-label="Chiudi"
+            @click="closeDetail"
+          ></button>
+        </div>
+
+        <div class="mov-modal-body">
+          <div class="mov-modal-amount" :class="{ neg: isOut(selected), pos: isIn(selected) }">
+            {{ formatCurrency(selected.importo) }}
+          </div>
+          <div class="mov-modal-date">
+            {{ formatDateLong(selected.data) }}
+          </div>
+
+          <dl class="mov-modal-info">
+            <div>
+              <dt>Descrizione</dt>
+              <dd>{{ selected.descrizione || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Tipo</dt>
+              <dd>{{ selected.tipo || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Categoria</dt>
+              <dd>{{ selected.categoria || '—' }}</dd>
+            </div>
+            <div>
+              <dt>Conto</dt>
+              <dd>{{ selected.conto || '—' }}</dd>
+            </div>
+            <div>
+              <dt>ID</dt>
+              <dd>{{ selected.id }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="mov-modal-footer">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            @click="closeDetail"
+          >
+            Chiudi
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -59,7 +137,7 @@ const props = defineProps({
   },
   view: {
     type: String,
-    default: 'periodo' // per il futuro, se vuoi cambiare il tipo di lista
+    default: 'periodo'
   }
 })
 
@@ -67,6 +145,9 @@ const profili = ref([])
 const rows = ref([])
 const loading = ref(false)
 const error = ref(null)
+
+const selected = ref(null)
+const showDetail = ref(false)
 
 const activeUserLabel = computed(() => {
   if (props.activeUser === 'salvo') return 'Salvo'
@@ -87,11 +168,6 @@ const profiloIdsAttivi = computed(() => {
     .map(p => p.id)
 })
 
-const hasData = computed(() => rows.value && rows.value.length > 0)
-
-// ordino già lato DB, ma qui tengo la computed per eventuali trasformazioni
-const movimenti = computed(() => rows.value || [])
-
 onMounted(() => {
   caricaMovimenti()
 })
@@ -111,9 +187,7 @@ async function caricaProfiliSeNecessario () {
       .from('profili')
       .select('id, nome')
 
-    if (!err && data) {
-      profili.value = data
-    }
+    if (!err && data) profili.value = data
   } catch (e) {
     console.error('Errore profili (lista):', e)
   }
@@ -128,10 +202,9 @@ async function caricaMovimenti () {
 
     let query = supabase
       .from('transazioni')
-      .select('id, data, importo, tipo, stato, user_id')
-      .eq('stato', 'confermato')
+      .select('*')
       .order('data', { ascending: false })
-      .limit(10) // ultimi 10 movimenti
+      .limit(30)
 
     const ids = profiloIdsAttivi.value
     if (ids.length > 0) {
@@ -139,6 +212,8 @@ async function caricaMovimenti () {
     }
 
     const { data, error: err } = await query
+
+    console.log('[Lista] righe:', data?.length || 0)
 
     if (err) {
       console.error('Errore transazioni (lista):', err)
@@ -157,17 +232,19 @@ async function caricaMovimenti () {
   }
 }
 
-function formatDate (iso) {
-  if (!iso) return ''
-  const d = new Date(iso)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('it-IT', {
-    day: '2-digit',
-    month: 'short'
-  })
+// ---------- UTIL ----------
+
+function isOut (row) {
+  const val = Number(row.importo) || 0
+  return row.tipo === 'Uscita' || val < 0
 }
 
-function formatImporto (value) {
+function isIn (row) {
+  const val = Number(row.importo) || 0
+  return row.tipo === 'Entrata' || val > 0
+}
+
+function formatCurrency (value) {
   const num = Number(value) || 0
   return new Intl.NumberFormat('it-IT', {
     style: 'currency',
@@ -175,15 +252,43 @@ function formatImporto (value) {
     minimumFractionDigits: 2
   }).format(num)
 }
+
+function formatDateShort (value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('it-IT', {
+    day: '2-digit',
+    month: 'short'
+  })
+}
+
+function formatDateLong (value) {
+  if (!value) return '—'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('it-IT', {
+    day: '2-digit',
+    month: 'long',
+    year: 'numeric'
+  })
+}
+
+function openDetail (row) {
+  selected.value = row
+  showDetail.value = true
+}
+
+function closeDetail () {
+  showDetail.value = false
+  selected.value = null
+}
 </script>
 
 <style scoped>
 .list-box {
-  /* si comporta come una dash-box: metà riga */
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
-
+  width: 100%;
+  height: 100%;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.7);
   display: flex;
@@ -192,6 +297,9 @@ function formatImporto (value) {
 }
 
 .list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 6px;
 }
 
@@ -208,13 +316,12 @@ function formatImporto (value) {
 
 .list-body {
   flex: 1 1 auto;
-  overflow-y: auto;
 }
 
-.list-body-center {
+.list-center {
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
 }
 
 .list-empty {
@@ -222,51 +329,164 @@ function formatImporto (value) {
   color: #6b7280;
 }
 
-.list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.list-row {
+.mov-list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.mov-row {
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 6px 8px;
+  display: flex;
   justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 0.85rem;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
 }
 
-.list-row:last-child {
-  border-bottom: none;
+.mov-row:hover {
+  background: #f3f4ff;
+  border-color: #6366f1;
 }
 
-.list-main {
+.mov-main {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
 }
 
-.list-date {
-  font-size: 0.75rem;
+.mov-date {
+  font-size: 0.7rem;
   color: #9ca3af;
 }
 
-.list-label {
+.mov-desc {
   font-size: 0.85rem;
-  color: #374151;
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.list-amount {
+.mov-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.mov-pill {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.mov-pill.alt {
+  background: #ecfeff;
+  color: #0e7490;
+}
+
+.mov-amount {
+  font-size: 0.85rem;
   font-weight: 600;
-  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
-.list-amount.positivo {
+.mov-amount.pos {
   color: #16a34a;
 }
 
-.list-amount.negativo {
+.mov-amount.neg {
   color: #dc2626;
+}
+
+/* MODALE DETTAGLIO */
+.mov-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+}
+
+.mov-modal {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 12px 14px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.25);
+}
+
+.mov-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.mov-modal-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.mov-modal-body {
+  padding-top: 4px;
+  padding-bottom: 6px;
+}
+
+.mov-modal-amount {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.mov-modal-amount.pos {
+  color: #16a34a;
+}
+
+.mov-modal-amount.neg {
+  color: #dc2626;
+}
+
+.mov-modal-date {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-bottom: 8px;
+}
+
+.mov-modal-info {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  font-size: 0.8rem;
+}
+
+.mov-modal-info dt {
+  font-weight: 600;
+  color: #4b5563;
+}
+
+.mov-modal-info dd {
+  margin: 0;
+  color: #111827;
+}
+
+.mov-modal-footer {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

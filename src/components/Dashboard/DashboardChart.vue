@@ -8,40 +8,27 @@
       </div>
     </div>
 
-    <!-- VISTE NON ANCORA IMPLEMENTATE -->
-    <template v-if="view !== 'periodo'">
-      <div class="chart-body">
-        <p class="chart-placeholder">
-          Per ora il grafico è disponibile solo per la vista
-          <strong>Periodo</strong>.
-        </p>
-        <p class="chart-note">
-          Seleziona "Periodo" nella colonna <strong>Vista</strong> a sinistra.
-        </p>
-      </div>
-    </template>
+    <!-- LOADING -->
+    <div v-if="loading" class="chart-body">
+      <div class="spinner-border text-primary" role="status"></div>
+    </div>
 
-    <!-- VISTA PERIODO: GRAFICO VERO -->
-    <template v-else>
-      <!-- Loading -->
-      <div v-if="loading" class="chart-body">
-        <div class="spinner-border text-primary" role="status"></div>
-      </div>
+    <!-- NESSUN DATO -->
+    <div
+      v-else-if="!hasData || chartData.labels.length === 0"
+      class="chart-body"
+    >
+      <p class="chart-placeholder">
+        Non ci sono abbastanza dati per generare il grafico.
+      </p>
+    </div>
 
-      <!-- Nessun dato -->
-      <div v-else-if="!hasData" class="chart-body">
-        <p class="chart-placeholder">
-          Non ci sono abbastanza dati per generare il grafico.
-        </p>
+    <!-- GRAFICO -->
+    <div v-else class="chart-body chart-body-hasdata">
+      <div class="chart-container">
+        <Bar :data="chartData" :options="chartOptions" />
       </div>
-
-      <!-- Grafico -->
-      <div v-else class="chart-body chart-body-hasdata">
-        <div class="chart-container">
-          <Bar :data="chartData" :options="chartOptions" />
-        </div>
-      </div>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -49,7 +36,6 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { supabase } from '@/supabase'
 
-// Chart.js + vue-chartjs
 import {
   Chart as ChartJS,
   Title,
@@ -61,7 +47,6 @@ import {
 } from 'chart.js'
 import { Bar } from 'vue-chartjs'
 
-// Registriamo i componenti di Chart.js (come in ChartsSection.vue)
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
 const props = defineProps({
@@ -71,17 +56,21 @@ const props = defineProps({
   },
   view: {
     type: String,
-    default: 'periodo' // 'periodo' | 'conti' | 'tipo' | 'categorie'
+    default: 'periodo' // 'periodo' | 'conti' | 'tipo' | 'categorie' | 'tag'
   }
 })
 
-// --- STATO DB ---
-const profili = ref([])          // profili (Salvo, Sigi, ecc.)
-const transazioni = ref([])      // transazioni filtrate per utente
+// ------------ STATO ------------
+const profili = ref([])
+const transazioni = ref([])
 const loading = ref(false)
 const error = ref(null)
 
-// --- LABEL TITOLO (in base alla vista) ---
+const hasData = computed(
+  () => transazioni.value && transazioni.value.length > 0
+)
+
+// ------------ LABEL UI ------------
 const titolo = computed(() => {
   switch (props.view) {
     case 'periodo':
@@ -91,20 +80,21 @@ const titolo = computed(() => {
     case 'tipo':
       return 'Analisi per tipo di movimento'
     case 'categorie':
-      return 'Analisi per categorie / tag'
+      return 'Analisi per categorie'
+    case 'tag':
+      return 'Analisi per tag'
     default:
       return 'Andamento generale'
   }
 })
 
-// --- LABEL UTENTE ATTIVO ---
 const activeUserLabel = computed(() => {
   if (props.activeUser === 'salvo') return 'Salvo'
   if (props.activeUser === 'sigi') return 'Sigi'
   return 'Tutti'
 })
 
-// --- ID PROFILI ATTIVI (come nei KPI) ---
+// ------------ FILTRO UTENTE SU PROFILI ------------
 const profiloIdsAttivi = computed(() => {
   if (!profili.value || profili.value.length === 0) return []
 
@@ -118,10 +108,7 @@ const profiloIdsAttivi = computed(() => {
     .map(p => p.id)
 })
 
-// Abbiamo dati?
-const hasData = computed(() => transazioni.value && transazioni.value.length > 0)
-
-// --- CARICAMENTO PROFILI + TRANSAZIONI ---
+// ------------ CARICAMENTO DATI ------------
 async function caricaProfiliSeNecessario () {
   if (profili.value.length > 0) return
 
@@ -130,13 +117,9 @@ async function caricaProfiliSeNecessario () {
       .from('profili')
       .select('id, nome')
 
-    if (err) {
-      console.error('Errore caricamento profili (chart):', err)
-      return
-    }
-    if (data) profili.value = data
+    if (!err && data) profili.value = data
   } catch (e) {
-    console.error('Errore generico profili (chart):', e)
+    console.error('Errore profili (chart):', e)
   }
 }
 
@@ -147,22 +130,38 @@ async function caricaTransazioni () {
   try {
     await caricaProfiliSeNecessario()
 
+    // 👇 qui facciamo anche la JOIN con transazioni_tags → tags
     let query = supabase
       .from('transazioni')
-      .select('id, data, importo, tipo, stato, user_id')
+      .select(`
+        id,
+        user_id,
+        data,
+        importo,
+        tipo,
+        categoria,
+        conto,
+        transazioni_tags (
+          tag_id,
+          tags (
+            id,
+            nome
+          )
+        )
+      `)
 
     const ids = profiloIdsAttivi.value
     if (ids.length > 0) {
       query = query.in('user_id', ids)
     }
 
-    // prendiamo solo transazioni confermate
-    query = query.eq('stato', 'confermato')
-
+    // niente filtro su "stato" per ora, così sei sicuro di vedere tutto
     const { data, error: err } = await query
 
+    console.log('[Chart] righe transazioni:', data?.length || 0)
+
     if (err) {
-      console.error('Errore caricamento transazioni (chart):', err)
+      console.error('Errore transazioni (chart):', err)
       error.value = 'DB'
       transazioni.value = []
       return
@@ -178,12 +177,10 @@ async function caricaTransazioni () {
   }
 }
 
-// Primo caricamento
 onMounted(() => {
   caricaTransazioni()
 })
 
-// Ricarica quando cambia utente (Tutti / Salvo / Sigi)
 watch(
   () => props.activeUser,
   () => {
@@ -191,10 +188,10 @@ watch(
   }
 )
 
-// --- LOGICA GRAFICO (solo vista "Periodo") ---
-// Raggruppiamo per mese e calcoliamo Entrate/Uscite
-const chartData = computed(() => {
-  const rawData = transazioni.value
+// ------------ BUILDER DATI PER OGNI VISTA ------------
+
+// PERIODO: Entrate/Uscite per mese (ultimi 6 mesi)
+function buildPeriodoData (rawData) {
   const mesiMap = {}
 
   rawData.forEach(t => {
@@ -202,15 +199,12 @@ const chartData = computed(() => {
     const d = new Date(t.data)
     if (Number.isNaN(d.getTime())) return
 
-    // chiave tipo "2024-03"
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
 
     if (!mesiMap[key]) mesiMap[key] = { in: 0, out: 0 }
 
     const importo = Number(t.importo) || 0
 
-    // Se nel DB hai il campo t.tipo ("Entrata"/"Uscita"), lo usiamo.
-    // Se per qualche transazione manca, usiamo il segno dell'importo.
     if (t.tipo === 'Entrata') {
       mesiMap[key].in += Math.abs(importo)
     } else if (t.tipo === 'Uscita') {
@@ -221,16 +215,11 @@ const chartData = computed(() => {
     }
   })
 
-  // Se non ci sono valori, ritorna struttura vuota (evita errori)
   const keys = Object.keys(mesiMap)
   if (keys.length === 0) {
-    return {
-      labels: [],
-      datasets: []
-    }
+    return { labels: [], datasets: [] }
   }
 
-  // Ordino le chiavi e prendo gli ultimi 6 mesi
   const sortedKeys = keys.sort().slice(-6)
 
   const labels = sortedKeys.map(k => {
@@ -259,9 +248,219 @@ const chartData = computed(() => {
       }
     ]
   }
+}
+
+// CONTI & BANCHE: top 5 conti
+function buildContiData (rawData) {
+  const contiMap = {}
+
+  rawData.forEach(t => {
+    const conto = (t.conto || 'Senza conto').trim() || 'Senza conto'
+    if (!contiMap[conto]) contiMap[conto] = { in: 0, out: 0 }
+
+    const importo = Number(t.importo) || 0
+
+    if (t.tipo === 'Entrata') {
+      contiMap[conto].in += Math.abs(importo)
+    } else if (t.tipo === 'Uscita') {
+      contiMap[conto].out += Math.abs(importo)
+    } else {
+      if (importo >= 0) contiMap[conto].in += importo
+      else contiMap[conto].out += Math.abs(importo)
+    }
+  })
+
+  const entries = Object.entries(contiMap)
+  if (entries.length === 0) {
+    return { labels: [], datasets: [] }
+  }
+
+  const top = entries
+    .map(([conto, v]) => ({
+      conto,
+      in: v.in,
+      out: v.out,
+      total: v.in + v.out
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 5)
+
+  const labels = top.map(e => e.conto)
+  const dataIn = top.map(e => e.in)
+  const dataOut = top.map(e => e.out)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Entrate',
+        backgroundColor: '#10b981',
+        data: dataIn,
+        borderRadius: 4
+      },
+      {
+        label: 'Uscite',
+        backgroundColor: '#6366f1',
+        data: dataOut,
+        borderRadius: 4
+      }
+    ]
+  }
+}
+
+// TIPO DI ANALISI: totale Entrate vs Uscite
+function buildTipoData (rawData) {
+  let totIn = 0
+  let totOut = 0
+
+  rawData.forEach(t => {
+    const val = Number(t.importo) || 0
+    if (val >= 0) totIn += val
+    else totOut += Math.abs(val)
+  })
+
+  if (totIn === 0 && totOut === 0) {
+    return { labels: [], datasets: [] }
+  }
+
+  return {
+    labels: ['Entrate', 'Uscite'],
+    datasets: [
+      {
+        label: 'Totale',
+        data: [totIn, totOut],
+        backgroundColor: ['#10b981', '#6366f1'],
+        borderRadius: 4
+      }
+    ]
+  }
+}
+
+// CATEGORIE: top 6 categorie
+function buildCategorieData (rawData) {
+  const catMap = {}
+
+  rawData.forEach(t => {
+    const cat = (t.categoria || 'Senza categoria').trim() || 'Senza categoria'
+    if (!catMap[cat]) catMap[cat] = { in: 0, out: 0 }
+
+    const importo = Number(t.importo) || 0
+
+    if (t.tipo === 'Entrata') {
+      catMap[cat].in += Math.abs(importo)
+    } else if (t.tipo === 'Uscita') {
+      catMap[cat].out += Math.abs(importo)
+    } else {
+      if (importo >= 0) catMap[cat].in += importo
+      else catMap[cat].out += Math.abs(importo)
+    }
+  })
+
+  const entries = Object.entries(catMap)
+  if (entries.length === 0) {
+    return { labels: [], datasets: [] }
+  }
+
+  const top = entries
+    .map(([categoria, v]) => ({
+      categoria,
+      in: v.in,
+      out: v.out,
+      total: v.in + v.out
+    }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 6)
+
+  const labels = top.map(e => e.categoria)
+  const dataIn = top.map(e => e.in)
+  const dataOut = top.map(e => e.out)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Entrate',
+        backgroundColor: '#10b981',
+        data: dataIn,
+        borderRadius: 4
+      },
+      {
+        label: 'Uscite',
+        backgroundColor: '#6366f1',
+        data: dataOut,
+        borderRadius: 4
+      }
+    ]
+  }
+}
+
+// TAG: top 8 tag usando la tabella transazioni_tags
+function buildTagData (rawData) {
+  const tagMap = {}
+
+  rawData.forEach(t => {
+    const relations = t.transazioni_tags || []
+    const amount = Math.abs(Number(t.importo) || 0)
+
+    relations.forEach(r => {
+      const tagName = r.tags?.nome || 'Senza tag'
+      if (!tagMap[tagName]) tagMap[tagName] = 0
+      tagMap[tagName] += amount
+    })
+  })
+
+  const entries = Object.entries(tagMap)
+  if (entries.length === 0) {
+    return { labels: [], datasets: [] }
+  }
+
+  const top = entries
+    .map(([tag, val]) => ({ tag, val }))
+    .sort((a, b) => b.val - a.val)
+    .slice(0, 8)
+
+  const labels = top.map(e => e.tag)
+  const dataVals = top.map(e => e.val)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Totale',
+        backgroundColor: '#6366f1',
+        data: dataVals,
+        borderRadius: 4
+      }
+    ]
+  }
+}
+
+// ------------ CHART DATA (sceglie il builder giusto) ------------
+const chartData = computed(() => {
+  const raw = transazioni.value || []
+
+  if (raw.length === 0) {
+    return { labels: [], datasets: [] }
+  }
+
+  if (props.view === 'conti') {
+    return buildContiData(raw)
+  }
+  if (props.view === 'tipo') {
+    return buildTipoData(raw)
+  }
+  if (props.view === 'categorie') {
+    return buildCategorieData(raw)
+  }
+  if (props.view === 'tag') {
+    return buildTagData(raw)
+  }
+
+  // default = periodo
+  return buildPeriodoData(raw)
 })
 
-// Opzioni Chart.js (copiate/adattate da ChartsSection.vue)
+// ------------ OPZIONI CHART ------------
 const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
@@ -319,6 +518,7 @@ const chartOptions = {
   width: 100%;
   height: 100%;
   border-radius: 12px;
+  border: 2px solid red;
   background: rgba(255, 255, 255, 0.7);
   display: flex;
   flex-direction: column;
