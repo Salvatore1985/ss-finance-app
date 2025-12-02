@@ -60,6 +60,7 @@ const formattedSaldo = computed(() => {
 <style scoped>
 .kpi-card {
   align-items: stretch;
+  background: rgba(255, 255, 255, 0.7);
 }
 
 .kpi-body {

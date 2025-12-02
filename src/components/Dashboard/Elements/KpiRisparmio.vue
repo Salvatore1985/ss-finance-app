@@ -63,20 +63,19 @@ const formattedRisparmio = computed(() => {
   min-width: 0;
   min-height: 0;
   border-radius: 12px;
-  border: 2px solid red;
   background: rgba(255, 255, 255, 0.7);
   display: flex;
   align-items: stretch;
   justify-content: center;
 }
 
-.kpi-body {
+/*.kpi-body {
   width: 100%;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
+}*/
 
 .kpi-label {
   font-size: 0.75rem;

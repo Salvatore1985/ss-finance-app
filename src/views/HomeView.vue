@@ -111,9 +111,10 @@
 
       <!-- RIGA LISTA + EXTRA -->
       <section class="row-bottom">
-        <div class="dash-box">
-          LISTA
-        </div>
+        <DashboardList
+          :active-user="activeUser"
+          :view="selectedView"
+        />
         <div class="dash-box extra-box">
           EXTRA
         </div>
@@ -126,6 +127,7 @@
 import { ref } from 'vue'
 import DashboardKpis from '@/components/Dashboard/DashboardKpis.vue'
 import DashboardChart from '@/components/Dashboard/DashboardChart.vue'
+import DashboardList from '@/components/Dashboard/DashboardList.vue'
 
 const activeUser = ref('all')          // 'all' | 'salvo' | 'sigi'
 const selectedView = ref('periodo')    // 'periodo' | 'conti' | 'tipo' | 'categorie'
@@ -323,10 +325,13 @@ function setView (viewId) {
     max-height: 60%;
   }
 
+  .row-kpi,
   .row-chart,
   .row-bottom {
-    flex: 0 0 auto;
+    flex: 0 0 auto;   
+    min-height: auto; 
   }
+
 
   .row-bottom {
     flex-wrap: wrap;
