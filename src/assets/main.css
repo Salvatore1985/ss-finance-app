@@ -51,24 +51,29 @@
   font-weight: 600;
   font-size: 0.75rem;
 }
+html {
+  overflow-x: hidden;
+}
 
 body {
   font-family: 'Plus Jakarta Sans', sans-serif;
   background-color: var(--bg-body);
   color: var(--text-main);
   /* Spazio sotto per il menu mobile, spazio sopra per il menu desktop */
-   padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
-
+  padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  overflow-x: hidden;
 }
 
 /* Sfondo Blob */
 .bg-blob {
   position: absolute;
-  top: -10%;
-  left: -10%;
-  width: 60%;
+  top: -12%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: clamp(420px, 82vw, 960px);
+  max-width: 100vw;
   height: 400px;
-  background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(248,250,252,0) 70%);
+  background: radial-gradient(circle, rgba(227, 227, 240, 0.15) 0%, rgba(248,250,252,0) 70%);
   z-index: -1;
   pointer-events: none;
 }
@@ -115,26 +120,33 @@ body {
   border-top-right-radius: 20px;
   box-shadow: 0 -5px 20px rgba(0,0,0,0.05);
   display: flex;
-  justify-content: space-around; /* Distanzia gli elementi */
+  justify-content: center; 
   align-items: flex-end; /* Allinea in basso */
-  padding: 10px 15px calc(15px + env(safe-area-inset-bottom, 0px)) 15px; /* Più spazio sotto per gli iPhone recenti */
+  gap: 6px;
+  padding: 10px 15px calc(15px + env(safe-area-inset-bottom, 0px)) 12px; /* Più spazio sotto per gli iPhone recenti */
   z-index: 1000;
   border-top: 1px solid #f1f5f9;
 }
 
 .nav-item {
   display: flex;
+  flex: 1 1 0;
   flex-direction: column;
+  min-width: 0;
   align-items: center;
   color: #94a3b8;
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 600;
-  padding: 5px;
-  width: 60px; /* Larghezza fissa per centrare */
+  padding: 6px 2px;
 }
 
-.nav-item i { font-size: 1.4rem; margin-bottom: 4px; transition: transform 0.2s; }
+.nav-item span {
+  white-space: nowrap;
+}
+
+
+.nav-item i { font-size: 1.25rem; margin-bottom: 3px; transition: transform 0.2s; }
 .nav-item.active { color: var(--primary); }
 .nav-item.active i { transform: translateY(-2px); }
 
@@ -157,22 +169,44 @@ body {
 
 /* FAB Mobile (Bottone Centrale) */
 .nav-item-fab {
-  width: 56px;
-  height: 56px;
+  width: 52px;
+  height: 52px;
   background: var(--primary);
   border-radius: 16px;
   display: flex;
   justify-content: center;
   align-items: center;
   color: white;
-  font-size: 1.8rem;
+  font-size: 1.6rem;
   box-shadow: 0 8px 15px rgba(99, 102, 241, 0.4);
-  transform: translateY(-25px); /* Esce fuori dalla barra */
+  transform: translateY(-22px); /* Esce fuori dalla barra */
   cursor: pointer;
   transition: transform 0.2s;
   z-index: 1001;
 }
 .nav-item-fab:active { transform: translateY(-20px) scale(0.95); }
+
+@media (max-width: 400px) {
+  .bottom-nav {
+    gap: 4px;
+    padding-inline: 10px;
+  }
+
+  .nav-item {
+    font-size: 0.62rem;
+    padding-block: 5px;
+  }
+
+  .nav-item i {
+    font-size: 1.15rem;
+  }
+
+  .nav-item-fab {
+    width: 48px;
+    height: 48px;
+    transform: translateY(-20px);
+  }
+}
 
 /* Utilities */
 

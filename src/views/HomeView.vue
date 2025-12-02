@@ -1,262 +1,345 @@
-<script setup>
-import { ref, onMounted, computed } from 'vue'
-import { supabase } from '../supabase'
-import DettaglioMovimento from '../components/DettaglioMovimento.vue'
-
-const movimenti = ref([])
-const caricamento = ref(true)
-const refDettaglio = ref(null) // Riferimento al modale
-
-// Filtro visuale (Totale/Salvo/Sigi) - Per ora solo estetico
-const filtroUtente = ref('Totale')
-
-// --- CALCOLI AUTOMATICI (Computed) ---
-const saldo = computed(() => {
-  return movimenti.value.reduce((acc, m) => m.tipo === 'Entrata' ? acc + parseFloat(m.importo) : acc - parseFloat(m.importo), 0).toFixed(2)
-})
-
-const entrate = computed(() => {
-  return movimenti.value
-    .filter(m => m.tipo === 'Entrata')
-    .reduce((acc, m) => acc + parseFloat(m.importo), 0)
-    .toFixed(2)
-})
-
-const uscite = computed(() => {
-  return Math.abs(
-    movimenti.value
-      .filter(m => m.tipo === 'Uscita')
-      .reduce((acc, m) => acc + parseFloat(m.importo), 0)
-  ).toFixed(2)
-})
-
-// --- SCARICAMENTO DATI ---
-const getMovimenti = async () => {
-  try {
-    caricamento.value = true
-    // Scarichiamo gli ultimi 20 movimenti per la Dashboard
-    let { data, error } = await supabase
-      .from('transazioni')
-      .select('*')
-      .order('data', { ascending: false })
-      .limit(20)
-
-    if (error) throw error
-    movimenti.value = data
-  } catch (error) {
-    console.error(error)
-  } finally {
-    caricamento.value = false
-  }
-}
-
-// --- GESTIONE BOTTONI ---
-const vediDettaglio = (mov) => refDettaglio.value.apri(mov, 'view')
-const modificaMovimento = (mov) => refDettaglio.value.apri(mov, 'edit')
-const dividiMovimento = (mov) => refDettaglio.value.apri(mov, 'split')
-
-onMounted(() => {
-  getMovimenti()
-})
-</script>
-
 <template>
-  <div class="container py-4">
-    
-    <!-- 1. FILTRI UTENTE (Pillole) -->
-    <div class="d-flex justify-content-center mb-4">
-      <div class="bg-white rounded-pill p-1 shadow-sm d-inline-flex">
-        <button 
-          @click="filtroUtente='Totale'" 
-          class="btn rounded-pill px-4 fw-bold btn-sm transition-all"
-          :class="filtroUtente==='Totale' ? 'btn-primary' : 'btn-light bg-transparent border-0 text-muted'"
-        >Totale</button>
-        <button 
-          @click="filtroUtente='Salvo'" 
-          class="btn rounded-pill px-4 fw-bold btn-sm transition-all"
-          :class="filtroUtente==='Salvo' ? 'btn-primary' : 'btn-light bg-transparent border-0 text-muted'"
-        >Salvo</button>
-        <button 
-          @click="filtroUtente='Sigi'" 
-          class="btn rounded-pill px-4 fw-bold btn-sm transition-all"
-          :class="filtroUtente==='Sigi' ? 'btn-primary' : 'btn-light bg-transparent border-0 text-muted'"
-        >Sigi</button>
-      </div>
-    </div>
+  <div class="dashboard-layout">
+    <!-- SIDEBAR SINISTRA -->
+    <aside class="dashboard-sidebar">
+      <h6 class="sidebar-title">CONTROLLI DASHBOARD</h6>
 
-    <div class="row g-4 mb-4">
-      
-      <!-- 2. COLONNA SINISTRA (KPI) -->
-      <div class="col-lg-5 d-flex flex-column gap-3">
-        
-        <!-- CARD SALDO VIOLA -->
-        <div class="card bg-purple-gradient p-4 text-white shadow-md position-relative overflow-hidden border-0">
-          <div class="position-relative z-1">
-            <div class="text-white-50 small fw-bold text-uppercase mb-1 ls-1">SALDO</div>
-            <h1 class="fw-bold mb-0 display-5">{{ saldo }} €</h1>
-          </div>
-          <!-- Decorazione Cerchio -->
-          <div class="position-absolute top-0 end-0 m-3 rounded-circle bg-white opacity-25" style="width: 80px; height: 80px;"></div>
-        </div>
-
-        <!-- ENTRATE / USCITE -->
-        <div class="row g-3">
-          <div class="col-6">
-            <div class="card p-3 h-100 border-0 shadow-sm">
-              <span class="small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Entrate</span>
-              <div class="d-flex align-items-center mt-2">
-                <i class="bi bi-arrow-down-circle-fill text-success me-2 fs-5"></i>
-                <h5 class="fw-bold text-dark mb-0">+{{ entrate }}</h5>
-              </div>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="card p-3 h-100 border-0 shadow-sm">
-              <span class="small fw-bold text-muted text-uppercase" style="font-size: 0.7rem;">Uscite</span>
-              <div class="d-flex align-items-center mt-2">
-                <i class="bi bi-arrow-up-circle-fill text-danger me-2 fs-5"></i>
-                <h5 class="fw-bold text-dark mb-0">-{{ uscite }}</h5>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CONTRIBUTO MESE (Placeholder Visivo) -->
-        <div class="card p-3 border-0 shadow-sm">
-          <div class="d-flex justify-content-between mb-2">
-            <span class="small fw-bold text-uppercase text-muted">Contributo Mese</span>
-            <i class="bi bi-people-fill text-muted"></i>
-          </div>
-          <div class="progress" style="height: 12px; border-radius: 6px;">
-            <div class="progress-bar bg-primary" style="width: 60%"></div>
-            <div class="progress-bar bg-info" style="width: 40%"></div>
-          </div>
-          <div class="d-flex justify-content-between mt-2 small fw-bold">
-            <span class="text-primary">Salvo (60%)</span>
-            <span class="text-info">(40%) Sigi</span>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- 3. COLONNA DESTRA (GRAFICI PLACEHOLDER) -->
-      <div class="col-lg-7">
-        <div class="card p-4 h-100 border-0 shadow-sm">
-          <h6 class="fw-bold mb-4 text-muted small text-uppercase">Trend</h6>
-          
-          <div class="row align-items-center h-100">
-            <!-- Grafico a Barre Finto -->
-            <div class="col-md-7 border-end">
-              <div class="d-flex align-items-end justify-content-around px-2" style="height: 180px;">
-                <div class="bg-primary opacity-50 rounded-top w-100 mx-1" style="height: 40%"></div>
-                <div class="bg-danger opacity-25 rounded-top w-100 mx-1" style="height: 60%"></div>
-                <div class="bg-primary opacity-50 rounded-top w-100 mx-1" style="height: 80%"></div>
-                <div class="bg-danger opacity-25 rounded-top w-100 mx-1" style="height: 30%"></div>
-                <div class="bg-primary rounded-top w-100 mx-1" style="height: 90%"></div>
-                <div class="bg-danger opacity-50 rounded-top w-100 mx-1" style="height: 50%"></div>
-              </div>
-              <div class="text-center small text-muted mt-2">Ultimi 6 Mesi</div>
-            </div>
-            
-            <!-- Grafico a Ciambella Finto -->
-            <div class="col-md-5 text-center mt-3 mt-md-0">
-              <div class="position-relative d-inline-block">
-                <div class="rounded-circle border border-5 border-primary" style="width: 140px; height: 140px; border-right-color: #e0e7ff !important;"></div>
-                <div class="position-absolute top-50 start-50 translate-middle fw-bold h4 m-0 text-primary">€</div>
-              </div>
-              <div class="mt-3 small d-flex justify-content-center gap-2">
-                <span class="badge bg-primary">Spesa</span>
-                <span class="badge bg-secondary bg-opacity-25 text-dark">Casa</span>
-              </div>
-            </div>
-          </div>
-
-        </div>
-      </div>
-
-    </div>
-
-    <!-- 4. LISTA RECENTI -->
-    <h5 class="fw-bold mb-3 px-1 border-2">Recenti</h5>
-
-    <div v-if="caricamento" class="text-center py-5">
-      <div class="spinner-border text-primary" role="status"></div>
-    </div>
-
-    <div v-else class="card border-0 shadow-sm mb-5">
-      <div class="list-group list-group-flush">
-        
-        <div 
-          v-for="mov in movimenti" 
-          :key="mov.id" 
-          class="list-group-item d-flex flex-column flex-sm-row justify-content-between align-items-center py-3 border-light gap-3"
+      <!-- UTENTI -->
+      <div class="sidebar-block">
+        <div class="sidebar-label">Utenti</div>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: activeUser === 'all' }"
+          @click="activeUser = 'all'"
         >
-          
-          <div class="d-flex align-items-center w-100">
-            <!-- Icona -->
-            <div class="rounded-circle bg-light p-2 me-3 d-flex justify-content-center align-items-center shadow-sm" style="width: 45px; height: 45px; flex-shrink: 0;">
-              <i class="bi fs-5" :class="mov.tipo === 'Entrata' ? 'bi-piggy-bank-fill text-success' : 'bi-bag-fill text-primary'"></i>
-            </div>
-            
-            <!-- Descrizione e Data -->
-            <div class="flex-grow-1 min-width-0">
-              <div class="d-flex justify-content-between align-items-center">
-                 <div class="fw-bold text-dark text-truncate pe-2">{{ mov.descrizione }}</div>
-                 <div class="fw-bold text-nowrap" :class="mov.tipo === 'Uscita' ? 'text-dark' : 'text-success'">
-                    {{ mov.tipo === 'Uscita' ? '' : '+' }} {{ parseFloat(mov.importo).toFixed(2) }} €
-                 </div>
-              </div>
-              <div class="d-flex align-items-center gap-2 mt-1">
-                <span class="badge bg-secondary bg-opacity-10 text-secondary border fw-medium" style="font-size: 0.7rem;">{{ mov.categoria }}</span>
-                <small class="text-muted" style="font-size: 0.75rem;">{{ new Date(mov.data).toLocaleDateString('it-IT', {day: '2-digit', month: 'short'}) }}</small>
-              </div>
-            </div>
-          </div>
+          Tutti
+        </button>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: activeUser === 'salvo' }"
+          @click="activeUser = 'salvo'"
+        >
+          Salvo
+        </button>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: activeUser === 'sigi' }"
+          @click="activeUser = 'sigi'"
+        >
+          Sigi
+        </button>
+      </div>
 
-          <!-- 3 BOTTONI AZIONE -->
-          <div class="d-flex gap-2 mt-2 mt-sm-0 w-100 w-sm-auto justify-content-end">
-            <button @click="vediDettaglio(mov)" class="btn btn-white border shadow-sm btn-sm px-2 py-1 text-primary btn-square" title="Vedi">
-              <i class="bi bi-eye"></i>
-            </button>
-            <button @click="modificaMovimento(mov)" class="btn btn-white border shadow-sm btn-sm px-2 py-1 text-dark btn-square" title="Modifica">
-              <i class="bi bi-pencil"></i>
-            </button>
-            <button @click="dividiMovimento(mov)" class="btn btn-white border shadow-sm btn-sm px-2 py-1 text-dark btn-square" title="Dividi">
-              <i class="bi bi-scissors"></i>
-            </button>
-          </div>
+      <!-- VISTA (collega i bottoni al grafico centrale) -->
+      <div class="sidebar-block">
+        <div class="sidebar-label">Vista</div>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: selectedView === 'periodo' }"
+          @click="setView('periodo')"
+        >
+          Periodo
+        </button>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: selectedView === 'conti' }"
+          @click="setView('conti')"
+        >
+          Conti &amp; Banche
+        </button>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: selectedView === 'tipo' }"
+          @click="setView('tipo')"
+        >
+          Tipo di analisi
+        </button>
+        <button
+          class="sidebar-btn"
+          :class="{ primary: selectedView === 'categorie' }"
+          @click="setView('categorie')"
+        >
+          Categorie / Tag
+        </button>
+      </div>
 
+      <!-- VISUALIZZAZIONE -->
+      <div class="sidebar-block">
+        <div class="sidebar-label">Visualizzazione</div>
+        <button class="sidebar-btn">Raggruppa per</button>
+        <button class="sidebar-btn">Layout dashboard</button>
+      </div>
+
+      <!-- FILTRI & CONFRONTI -->
+      <div class="sidebar-block">
+        <div class="sidebar-label">Filtri &amp; confronti</div>
+        <button class="sidebar-btn">Filtri avanzati</button>
+        <button class="sidebar-btn">Confronta con...</button>
+      </div>
+
+      <!-- AZIONI -->
+      <div class="sidebar-block">
+        <div class="sidebar-label">Azioni</div>
+        <button class="sidebar-btn">Esporta / Condividi</button>
+        <button class="sidebar-btn">Reset filtri</button>
+      </div>
+
+      <!-- INFO FINALE -->
+      <div class="sidebar-info">
+        <div class="sidebar-info-icon">i</div>
+        <div class="sidebar-info-text">
+          Questi comandi modificano<br />
+          solo la vista attuale.
         </div>
       </div>
-      
-      <!-- Se vuoto -->
-      <div v-if="movimenti.length === 0" class="text-center py-4 text-muted small">
-          Nessun movimento ancora.
-      </div>
-    </div>
+    </aside>
 
-    <!-- Modale Dettaglio (Invisibile) -->
-    <DettaglioMovimento ref="refDettaglio" @refresh="getMovimenti" />
+    <!-- AREA PRINCIPALE -->
+    <main class="dashboard-main">
+      <!-- RIGA KPI: usa il componente che abbiamo già creato -->
+      <section class="row-kpi">
+        <DashboardKpis :active-user="activeUser" />
+      </section>
 
+      <!-- RIGA GRAFICO -->
+      <section class="row-chart" ref="chartSection">
+        <DashboardChart
+          :active-user="activeUser"
+          :view="selectedView"
+        />
+      </section>
+
+      <!-- RIGA LISTA + EXTRA -->
+      <section class="row-bottom">
+        <div class="dash-box">
+          LISTA
+        </div>
+        <div class="dash-box extra-box">
+          EXTRA
+        </div>
+      </section>
+    </main>
   </div>
 </template>
 
-<style scoped>
-.transition-all {
-  transition: all 0.2s ease;
+<script setup>
+import { ref } from 'vue'
+import DashboardKpis from '@/components/Dashboard/DashboardKpis.vue'
+import DashboardChart from '@/components/Dashboard/DashboardChart.vue'
+
+const activeUser = ref('all')          // 'all' | 'salvo' | 'sigi'
+const selectedView = ref('periodo')    // 'periodo' | 'conti' | 'tipo' | 'categorie'
+const chartSection = ref(null)
+
+// quando cambio vista:
+// - aggiorno selectedView
+// - su mobile scrollo dolcemente alla sezione grafico
+function setView (viewId) {
+  selectedView.value = viewId
+
+  if (window.innerWidth <= 992 && chartSection.value) {
+    chartSection.value.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start'
+    })
+  }
 }
-.btn-square {
-  width: 36px; 
-  height: 36px;
+</script>
+
+<style scoped>
+/* ROOT DELLA PAGINA: riempie tutta l'area app-content */
+.dashboard-layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  background: #f4f7fb;
+  min-height: 0;
+}
+
+/* SIDEBAR SINISTRA */
+.dashboard-sidebar {
+  width: 260px;
+  padding: 16px;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex-shrink: 0;
+  background: #ffffff;
+
+  min-height: 0;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+.sidebar-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.sidebar-block {
+  margin-bottom: 16px;
+}
+
+.sidebar-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin-bottom: 6px;
+}
+
+.sidebar-btn {
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #ffffff;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.sidebar-btn.primary {
+  border-color: #4f46e5;
+  background: #4f46e5;
+  color: #ffffff;
+}
+
+.sidebar-info {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #e0f2fe;
+  font-size: 0.75rem;
+  color: #0f172a;
+}
+
+.sidebar-info-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  border: 1px solid #0f172a;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 600;
 }
-.btn-white {
-  background-color: white;
+
+/* AREA PRINCIPALE */
+.dashboard-main {
+  flex: 1 1 auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  min-height: 0;
 }
-.btn-white:hover {
-  background-color: #f8fafc;
+
+/* RIGHE della dashboard */
+.row-kpi {
+  flex: 0 0 22%;
+  min-height: 0;
+}
+
+.row-chart {
+  flex: 0 0 33%;
+  display: flex;
+  min-height: 0;
+}
+
+.row-chart > * {
+  flex: 1 1 0;
+}
+
+.row-bottom {
+  flex: 1 1 0;
+  display: flex;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* Card placeholder (grafico/lista/extra) */
+.dash-box {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  border-radius: 12px;
+  border: 2px solid red;
+  background: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+/* RESPONSIVE */
+@media (max-width: 992px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+
+  .dashboard-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    gap: 8px;
+    padding: 8px 12px;
+    max-height: 40%;
+  }
+
+  .sidebar-title {
+    width: 100%;
+  }
+
+  .sidebar-btn {
+    flex: 1 1 calc(50% - 6px);
+    font-size: 0.8rem;
+    padding: 8px;
+  }
+
+  .sidebar-info {
+    width: 100%;
+    margin-top: 8px;
+  }
+
+  .dashboard-main {
+    padding: 8px;
+    flex: 1 1 auto;
+    overflow-y: auto;
+    max-height: 60%;
+  }
+
+  .row-chart,
+  .row-bottom {
+    flex: 0 0 auto;
+  }
+
+  .row-bottom {
+    flex-wrap: wrap;
+  }
+
+  .row-bottom .extra-box {
+    flex: 1 1 100%;
+  }
+}
+
+@media (max-width: 576px) {
+  .row-bottom .extra-box {
+    display: none;
+  }
 }
 </style>

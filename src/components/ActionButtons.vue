@@ -1,58 +1,38 @@
-+55
--0
-
 <template>
+  <!-- Container flessibile per allineare i bottoni -->
   <div class="d-flex gap-2 justify-content-end w-100 w-md-auto mt-2 mt-md-0">
-    <button
-      @click="$emit('view')"
-      class="btn btn-white border shadow-sm btn-action text-primary"
+    
+    <!-- Tasto Dettaglio (Occhio) -->
+    <Button
+      icon="bi-eye"
+      class="bg-white border text-primary shadow-sm"
       title="Dettaglio"
-      type="button"
-    >
-      <i class="bi bi-eye"></i>
-    </button>
+      @click="$emit('view')"
+    />
 
-    <button
-      @click="$emit('edit')"
-      class="btn btn-white border shadow-sm btn-action text-dark"
+    <!-- Tasto Modifica (Matita) -->
+    <Button
+      icon="bi-pencil"
+      class="bg-white border text-dark shadow-sm"
       title="Modifica"
-      type="button"
-    >
-      <i class="bi bi-pencil"></i>
-    </button>
+      @click="$emit('edit')"
+    />
 
-    <button
-      @click="$emit('split')"
-      class="btn btn-white border shadow-sm btn-action text-dark"
+    <!-- Tasto Split (Forbici) -->
+    <Button
+      icon="bi-scissors"
+      class="bg-white border text-dark shadow-sm"
       title="Dividi"
-      type="button"
-    >
-      <i class="bi bi-scissors"></i>
-    </button>
+      @click="$emit('split')"
+    />
+    
   </div>
 </template>
 
 <script setup>
-defineEmits(['view', 'edit', 'split'])
-</script>
+// Importiamo il bottone dalla cartella UI (aggiusta il percorso se serve)
+import Button from '@/components/UI/Button/Button.vue';
 
-<style scoped>
-.btn-action {
-  width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 10px;
-  transition: all 0.2s;
-  background-color: #fff;
-}
-.btn-action:hover {
-  background-color: #f8fafc;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-}
-.btn-white {
-  background-color: white;
-}
-</style>
+// Definiamo gli eventi che questo componente spara al genitore
+defineEmits(['view', 'edit', 'split']);
+</script>

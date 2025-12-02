@@ -1,245 +1,131 @@
+<template>
+  <div id="app-shell">
+    
+    <!-- HEADER DESKTOP -->
+    <header class="app-header d-none d-lg-block">
+      <Header />
+    </header>
+
+    <!-- HEADER MOBILE -->
+    <header class="app-header-mobile d-lg-none">
+      <div class="d-flex justify-content-between align-items-center px-3 py-2 h-100">
+        <span class="fw-bold text-primary">
+          <i class="bi bi-wallet2"></i> Finance
+        </span>
+        <div
+          class="avatar-small bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
+          style="width:32px;height:32px;"
+        >
+          S
+        </div>
+      </div>
+    </header>
+
+    <!-- CONTENUTO CENTRALE (senza scroll, passa 100% spazio alla pagina) -->
+    <div class="app-content">
+      <router-view v-slot="{ Component }">
+        <transition name="fade" mode="out-in">
+          <component :is="Component" />
+        </transition>
+      </router-view>
+    </div>
+
+    <!-- FOOTER MOBILE -->
+    <footer class="app-footer d-lg-none">
+      <Footer />
+    </footer>
+
+    <!-- MODALE GLOBALE -->
+    <NuovoMovimento />
+  </div>
+</template>
+
 <script setup>
-import { RouterView, useRoute, useRouter } from 'vue-router'
-import { ref, onMounted, computed, watch } from 'vue'
-import NuovoMovimento from './components/NuovoMovimento.vue'
-import { Modal } from 'bootstrap'
-import { supabase } from './supabase'
-
-// route & router
-const route = useRoute()
-const router = useRouter()
-
-// -------- UTENTE LOGGATO --------
-const userEmail = ref('')
-
-// mappa email -> nome
-const EMAIL_TO_NAME = {
-  'salvatorecascone8@gmail.com': 'Salvo',
-  // 👇 SOSTITUISCI con l’email vera di Sigi
-  'sigidembacaj@gmail.com': 'Sigi',
-}
-
-const isLoggedIn = computed(() => !!userEmail.value)
-
-const userLabel = computed(() => {
-  if (!userEmail.value) return 'Accedi'
-
-  const email = userEmail.value.toLowerCase().trim()
-  if (EMAIL_TO_NAME[email]) return EMAIL_TO_NAME[email]
-
-  const nick = email.split('@')[0] || 'Account'
-  return nick.charAt(0).toUpperCase() + nick.slice(1)
-})
-
-const caricaUtente = async () => {
-  const { data, error } = await supabase.auth.getUser()
-  if (!error && data.user) {
-    userEmail.value = data.user.email || ''
-  } else {
-    userEmail.value = ''
-  }
-}
-
-// stato apertura menu account
-const showAccountMenu = ref(false)
-
-const toggleAccountMenu = () => {
-  if (!isLoggedIn.value) {
-    // se non sei loggato → vai al login
-    router.push('/login')
-  } else {
-    showAccountMenu.value = !showAccountMenu.value
-  }
-}
-
-// chiudi menu quando cambi pagina
-watch(
-  () => route.fullPath,
-  () => {
-    showAccountMenu.value = false
-  }
-)
-
-// logout vero
-const logout = async () => {
-  await supabase.auth.signOut()
-  userEmail.value = ''
-  showAccountMenu.value = false
-  router.push('/login')
-}
-
-// -------- NAV / MODALE --------
-const vaiA = (path) => {
-  router.push(path)
-}
-
-const apriNuovo = () => {
-  const el = document.getElementById('modalNuovo')
-  if (!el) return
-  const modal = new Modal(el)
-  modal.show()
-}
-
-const refreshData = () => {
-  window.location.reload()
-}
-
-onMounted(() => {
-  caricaUtente()
-})
+import Header from '@/components/Layout/Header.vue'
+import Footer from '@/components/Layout/Footer.vue'
+import NuovoMovimento from '@/components/Movimenti/NuovoMovimento.vue'
 </script>
 
-<template>
-  <div class="bg-blob"></div>
+<style>
+/* RESET GLOBALE / FULLSCREEN WEBAPP */
+* {
+  box-sizing: border-box;
+}
 
-  <!-- NAVBAR DESKTOP -->
-  <nav class="navbar d-none d-lg-block navbar-expand-lg glass-nav mb-2">
-    <div class="container">
-      <a class="navbar-brand fw-bold" href="#" style="color: var(--primary-dark);">
-        <i class="bi bi-wallet-fill me-2"></i>S.S. Finance
-      </a>
-      
-      <div class="d-flex gap-2 align-items-center">
-        <button class="btn btn-nav" :class="{ active: route.name === 'dashboard' }" @click="vaiA('/')">
-          <i class="bi bi-grid-1x2-fill"></i> Dash
-        </button>
-        <button class="btn btn-nav" :class="{ active: route.name === 'movimenti' }" @click="vaiA('/movimenti')">
-          <i class="bi bi-receipt-cutoff"></i> Movimenti
-        </button>
-        <button class="btn btn-nav" :class="{ active: route.name === 'storico' }" @click="vaiA('/storico')">
-          <i class="bi bi-search"></i> Storico
-        </button>
-        <button class="btn btn-nav" :class="{ active: route.name === 'check' }" @click="vaiA('/check')">
-          <i class="bi bi-check-circle-fill"></i> Check
-        </button>
-        <button class="btn btn-nav" :class="{ active: route.name === 'importa' }" @click="vaiA('/importa')">
-          <i class="bi bi-cloud-arrow-up-fill"></i> Importa
-        </button>
-        <button class="btn btn-nav" :class="{ active: route.name === 'config' }" @click="vaiA('/config')">
-          <i class="bi bi-gear-fill"></i> Config
-        </button>
-        
-        <button class="btn btn-primary btn-sm fw-bold ms-3 px-3 rounded-pill shadow-sm" @click="apriNuovo">
-          <i class="bi bi-plus-lg me-1"></i> Nuovo
-        </button>
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden; /* ❌ niente scroll del browser */
+  background-color: #f8fafc;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
 
-        <!-- ICONA / MENU ACCOUNT DESKTOP -->
-        <div class="position-relative ms-2">
-          <button
-            class="btn btn-outline-secondary btn-sm rounded-pill d-flex align-items-center gap-2"
-            type="button"
-            @click="toggleAccountMenu"
-          >
-            <i class="bi bi-person-circle"></i>
-            <span class="small">{{ userLabel }}</span>
-            <i v-if="isLoggedIn" class="bi bi-caret-down-fill small"></i>
-          </button>
+/* LAYOUT A COLONNA: Header -> Content -> Footer */
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh; /* riempie tutto lo schermo */
+}
 
-          <!-- MENU A TENDINA -->
-          <div
-            v-if="isLoggedIn && showAccountMenu"
-            class="account-menu shadow-sm rounded-3 bg-white position-absolute end-0 mt-2 py-2"
-            style="min-width: 180px; z-index: 1050;"
-          >
-            <div class="px-3 pb-2 small text-muted">
-              Collegato come
-              <div class="fw-semibold text-dark">{{ userLabel }}</div>
-            </div>
-            <button
-              class="dropdown-item text-danger small px-3"
-              type="button"
-              @click="logout"
-            >
-              <i class="bi bi-box-arrow-right me-1"></i>
-              Esci / cambia utente
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </nav>
+/* Header Desktop */
+.app-header {
+  height: 70px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  z-index: 50;
+}
 
-  <!-- CONTENUTO PRINCIPALE -->
-  <div class="container main-container">
-    
-    <!-- HEADER MOBILE -->
-    <div class="d-flex d-lg-none justify-content-between align-items-center mb-4 pt-4 px-3">
-      <div>
-        <small class="text-muted fw-semibold">Ciao,</small>
-        <h4 class="fw-bold text-dark m-0">{{ userLabel }}</h4>
-      </div>
-      <button
-        class="shadow-sm rounded-circle p-2 bg-white text-primary border-0"
-        type="button"
-        @click="toggleAccountMenu"
-      >
-        <i class="bi bi-person-fill fs-4"></i>
-      </button>
-    </div>
+/* Header Mobile */
+.app-header-mobile {
+  height: 50px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-bottom: 1px solid #e2e8f0;
+  z-index: 50;
+}
 
-    <!-- piccolo menu mobile (riuso lo stesso stato) -->
-    <div
-      v-if="isLoggedIn && showAccountMenu"
-      class="d-lg-none px-3 mb-3"
-    >
-      <div class="card shadow-sm">
-        <div class="card-body py-2">
-          <div class="small text-muted">
-            Collegato come
-          </div>
-          <div class="fw-semibold mb-2">{{ userLabel }}</div>
-          <button
-            class="btn btn-outline-danger btn-sm w-100"
-            type="button"
-            @click="logout"
-          >
-            <i class="bi bi-box-arrow-right me-1"></i>
-            Esci / cambia utente
-          </button>
-        </div>
-      </div>
-    </div>
+/* AREA CONTENUTO
+   - prende tutto lo spazio tra header e footer
+   - niente scroll
+   - il figlio (pagina) si stira a 100% */
+.app-content {
+  flex: 1 1 auto;
+  position: relative;
+  overflow: hidden;   /* niente scroll globale */
+  display: flex;      /* permette al figlio di riempire l'area */
+  min-height: 0;
+}
 
-    <!-- QUI IL ROUTER MOSTRA LA PAGINA -->
-    <RouterView />
-    
-  </div>
+/* Il componente caricato dal router-view riempie l'area centrale */
+.app-content > * {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+}
 
-  <!-- NAVBAR MOBILE IN BASSO -->
-  <div class="bottom-nav d-lg-none">
-    <div class="nav-item" :class="{ active: route.name === 'dashboard' }" @click="vaiA('/')">
-      <i class="bi bi-grid-1x2-fill"></i>
-      <span>Dash</span>
-    </div>
+/* Footer Mobile */
+.app-footer {
+  height: 70px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  z-index: 50;
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
-    <div class="nav-item" :class="{ active: route.name === 'movimenti' }" @click="vaiA('/movimenti')">
-      <i class="bi bi-receipt"></i>
-      <span>Mov</span>
-    </div>
+/* Animazione fade tra le pagine */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.15s ease;
+}
 
-    <div class="nav-item" :class="{ active: route.name === 'storico' }" @click="vaiA('/storico')">
-      <i class="bi bi-search"></i>
-      <span>Storico</span>
-    </div>
-    <div class="nav-item" :class="{ active: route.name === 'check' }" @click="vaiA('/check')">
-      <i class="bi bi-check-circle-fill"></i>
-      <span>Check</span>
-    </div>
-    <div class="nav-item-fab" @click="apriNuovo">
-      <i class="bi bi-plus-lg"></i>
-    </div>
-
-    <div class="nav-item" :class="{ active: route.name === 'importa' }" @click="vaiA('/importa')">
-      <i class="bi bi-cloud-arrow-up-fill"></i>
-      <span>Importa</span>
-    </div>
-    
-    <div class="nav-item" :class="{ active: route.name === 'config' }" @click="vaiA('/config')">
-      <i class="bi bi-gear"></i>
-      <span>Config</span>
-    </div>
-  </div>
-
-  <!-- MODALE NUOVO MOVIMENTO -->
-  <NuovoMovimento @saved="refreshData" />
-</template>
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+</style>

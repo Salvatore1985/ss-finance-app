@@ -4,7 +4,7 @@ import { supabase } from '../supabase'
 import { parseBankFile } from '../utils/BankParser'
 import { applicaRegole } from '../utils/RuleEngine'
 import { useRouter } from 'vue-router'
-import ConflittoMovimento from '../components/ConflittoMovimento.vue'
+import ConflittoMovimento from '../components/Movimenti/ConflittoMovimento.vue'
 
 const router = useRouter()
 const step = ref(1)

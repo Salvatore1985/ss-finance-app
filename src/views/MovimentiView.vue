@@ -1,115 +1,77 @@
-<script setup>
-import { ref, onMounted } from 'vue'
-import { supabase } from '../supabase'
-import DettaglioMovimento from '../components/DettaglioMovimento.vue'
-import ActionButtons from '../components/ActionButtons.vue'
-import MovimentoInfo from '../components/MovimentoInfo.vue'
-const movimenti = ref([])
-const caricamento = ref(true)
-const refDettaglio = ref(null)
-
-const getMovimenti = async () => {
-  try {
-    caricamento.value = true
-    let { data, error } = await supabase
-      .from('transazioni')
-      .select('*')
-      .order('data', { ascending: false })
-      .limit(100)
-
-    if (error) throw error
-    movimenti.value = data
-  } catch (error) {
-    console.error(error)
-  } finally {
-    caricamento.value = false
-  }
-}
-
-// Funzioni specifiche per i 3 bottoni
-const vediDettaglio = (mov) => {
-  refDettaglio.value.apri(mov, 'view') // Apre in lettura (Occhio)
-}
-
-const modificaMovimento = (mov) => {
-  refDettaglio.value.apri(mov, 'edit') // Apre in modifica (Matita)
-}
-
-const dividiMovimento = (mov) => {
-  refDettaglio.value.apri(mov, 'split') // Apre in split (Forbice)
-}
-
-onMounted(() => {
-  getMovimenti()
-})
-</script>
-
 <template>
-  <div class="movimenti-page container py-3 d-flex flex-column min-vh-100">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-      <h4 class="fw-bold m-0">Movimenti</h4>
-      <span class="badge bg-light text-muted border">{{ movimenti.length }} transazioni</span>
-    </div>
-    <div class="movimenti-scroll flex-grow-1 rounded-3 border bg-white shadow-sm position-relative">
-      <div v-if="caricamento" class="text-center py-5">
-        <div class="spinner-border text-primary" role="status"></div>
+  <!-- CONTENITORE: Altezza 100% del padre (main-area) -->
+  <div class="page-fixed-layout">
+    
+    <!-- A. INTESTAZIONE (NON SCORRE) -->
+    <header class="page-header px-4 py-4 bg-white border-bottom">
+      <div class="d-flex justify-content-between align-items-center">
+        <div>
+          <h3 class="fw-bold text-dark m-0">Movimenti</h3>
+          <p class="text-muted small m-0">Lista completa transazioni</p>
+        </div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-light border fw-bold shadow-sm">Filtra</button>
+          <button class="btn btn-primary fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalNuovo">
+            <i class="bi bi-plus-lg me-1"></i> Nuovo
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- B. LISTA (SCORRE SOLO QUI) -->
+    <div class="page-content-scroll px-4 py-3">
+      
+      <!-- Esempio Lista -->
+      <div v-for="n in 15" :key="n" class="card border-0 shadow-sm mb-2 p-3">
+        <div class="d-flex justify-content-between align-items-center">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center" style="width:45px;height:45px;">
+              <i class="bi bi-bag"></i>
+            </div>
+            <div>
+              <div class="fw-bold text-dark">Spesa Supermercato {{ n }}</div>
+              <div class="text-muted small">Categoria • Conto Intesa</div>
+            </div>
+          </div>
+          <div class="fw-bold fs-5">- 45,{{ n }}0 €</div>
+        </div>
       </div>
 
-      <div v-else class="card border-0 shadow-sm">
-        <div class="list-group list-group-flush">
-          
-          <!-- NOTA: Ho tolto @click dalla riga intera -->
-          <div
-            v-for="mov in movimenti"
-            :key="mov.id"
-            class="list-group-item py-3 border-light"
-          >
-            <MovimentoInfo
-              :movimento="mov"
-              :show-tags="false"
-              :show-attachments="false"
-            >
-              <template #actions>
-                <ActionButtons
-                  @view="vediDettaglio(mov)"
-                  @edit="modificaMovimento(mov)"
-                  @split="dividiMovimento(mov)"
-                />
-              </template>
-            </MovimentoInfo>
-          </div>
-        </div>
-        
-        <div v-if="movimenti.length === 0" class="text-center py-5 text-muted">
-          <i class="bi bi-inbox fs-1 d-block mb-2 opacity-50"></i>
-          Nessun movimento trovato.
-        </div>
-    </div>
-    </div>
+      <!-- Spazio finale -->
+      <div style="height: 50px;"></div>
 
-    <DettaglioMovimento ref="refDettaglio" @refresh="getMovimenti" />
+    </div>
 
   </div>
 </template>
 
 <style scoped>
-.movimenti-page {
-  max-height: none;
-  min-height: 100vh;
+/* 1. STRUTTURA VERTICALE */
+.page-fixed-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Occupa tutto lo spazio disponibile */
+  width: 100%;
 }
 
-.movimenti-scroll {
-  overflow: visible;
-  min-height: 0;
+/* 2. TESTA FISSA */
+.page-header {
+  flex-shrink: 0; /* Non si schiaccia */
+  z-index: 10;
 }
 
-@media (min-width: 992px) {
-  .movimenti-page {
-    max-height: calc(100vh - 160px);
-  }
-
-  .movimenti-scroll {
-    overflow: auto;
-  }
+/* 3. CORPO SCORREVOLE */
+.page-content-scroll {
+  flex-grow: 1; /* Occupa tutto lo spazio rimanente */
+  overflow-y: auto; /* ABILITA LO SCROLL QUI */
+  overflow-x: hidden;
+  
+  /* Scrollbar carina */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
+
+/* Webkit Scrollbar */
+.page-content-scroll::-webkit-scrollbar { width: 6px; }
+.page-content-scroll::-webkit-scrollbar-thumb { background-color: #cbd5e1; border-radius: 10px; }
 </style>

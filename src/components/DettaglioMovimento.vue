@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { supabase } from '../supabase'
+import { supabase } from '../../supabase'
 import { Modal } from 'bootstrap'
 
 const emit = defineEmits(['refresh'])
