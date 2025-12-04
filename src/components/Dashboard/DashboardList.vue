@@ -99,7 +99,7 @@
             </div>
             <div>
               <dt>Categoria</dt>
-              <dd>{{ selected.categoria || '—' }}</dd>
+              <dd>{{ selected.categoria_banca || '—' }}</dd>
             </div>
             <div>
               <dt>Conto</dt>
@@ -108,6 +108,26 @@
             <div>
               <dt>ID</dt>
               <dd>{{ selected.id }}</dd>
+            </div>
+            <div>
+              <dt>Tag</dt>
+            <dd>
+              <!-- Caso: tags è un array -->
+              <template v-if="Array.isArray(selected.tags) && selected.tags.length">
+                <span
+                  v-for="tag in selected.tags"
+                  :key="tag"
+                  class="badge-tag me-1 mb-1"
+                >
+                  {{ tag }}
+                </span>
+              </template>
+
+              <!-- Caso: tags è stringa singola o vuoto -->
+              <template v-else>
+                {{ selected.tags || '—' }}
+              </template>
+            </dd>
             </div>
           </dl>
         </div>

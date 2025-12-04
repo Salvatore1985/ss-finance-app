@@ -1,20 +1,24 @@
-import Papa from 'papaparse'
-import readXlsxFile from 'read-excel-file'
+import Papa from "papaparse";
+import readXlsxFile from "read-excel-file";
 
-// Funzione principale
+// =============================
+// FUNZIONE PRINCIPALE
+// =============================
 export async function parseBankFile(file) {
-  const extension = file.name.split('.').pop().toLowerCase()
+  const extension = file.name.split(".").pop().toLowerCase();
 
-  if (extension === 'csv') {
-    return await parseCSV(file)
-  } else if (extension === 'xlsx' || extension === 'xls') {
-    return await parseExcel(file)
+  if (extension === "csv") {
+    return await parseCSV(file);
+  } else if (extension === "xlsx" || extension === "xls") {
+    return await parseExcel(file);
   } else {
-    throw new Error("Formato non supportato. Usa CSV o XLSX.")
+    throw new Error("Formato non supportato. Usa CSV o XLSX.");
   }
 }
 
-// Lettore CSV
+// =============================
+// LETTORE CSV
+// =============================
 function parseCSV(file) {
   return new Promise((resolve, reject) => {
     Papa.parse(file, {
@@ -22,191 +26,226 @@ function parseCSV(file) {
       skipEmptyLines: true,
       complete: (results) => {
         try {
-          const datiNormalizzati = analizzaRighe(results.data, file.name)
-          resolve(datiNormalizzati)
+          const datiNormalizzati = analizzaRighe(results.data, file.name);
+          resolve(datiNormalizzati);
         } catch (e) {
-          reject(e)
+          reject(e);
         }
       },
-      error: (err) => reject(err)
-    })
-  })
+      error: (err) => reject(err),
+    });
+  });
 }
 
-// Lettore Excel
+// =============================
+// LETTORE EXCEL
+// =============================
 async function parseExcel(file) {
-  const rows = await readXlsxFile(file)
-  return analizzaRighe(rows, file.name)
+  const rows = await readXlsxFile(file);
+  return analizzaRighe(rows, file.name);
 }
 
-// --- IL CERVELLO: Capisce la banca e normalizza i dati ---
+// =============================
+// CERVELLO: RICONOSCE BANCA E NORMALIZZA
+// =============================
 function analizzaRighe(rows, fileName) {
-  if (!rows || rows.length < 1) throw new Error("File vuoto")
+  if (!rows || rows.length < 1) {
+    throw new Error("File vuoto");
+  }
 
-  let colData = -1
-  let colDesc = -1
-  let colImporto = -1
-  let colCategoria = -1
-  let colStato = -1 // Nuova gestione stato
-  let startRow = 0
-  let bancaRilevata = 'Generica'
+  let colData = -1;
+  let colDesc = -1;
+  let colImporto = -1;
+  let colCategoria = -1;
+  let colStato = -1; // solo per Revolut
+  let startRow = 0;
+  let bancaRilevata = "Generica";
 
-  // 1. AUTO-RILEVAMENTO DELLE COLONNE
+  // 1) AUTO-RILEVAMENTO COLONNE
   for (let i = 0; i < Math.min(20, rows.length); i++) {
-    const riga = rows[i].map(c => String(c).toLowerCase().trim())
+    const rigaOriginale = rows[i] || [];
+    const riga = rigaOriginale.map((c) => String(c).toLowerCase().trim());
 
-    // --- LOGICA REVOLUT (CSV TUO) ---
-    // Cerca: "tipo", "data di inizio", "descrizione", "importo", "state"
+    // ---------- LOGICA REVOLUT ----------
+    // Header tipico:
+    // Tipo | Prodotto | Data di inizio | Data di completamento | Descrizione | Importo | Commissione | Valuta | State | Saldo | (Categoria)
     if (
-      riga.includes('tipo') &&
-      riga.includes('data di inizio') &&
-      riga.includes('importo') &&
-      riga.includes('descrizione')
+      riga.includes("tipo") &&
+      riga.includes("data di inizio") &&
+      riga.includes("importo") &&
+      riga.includes("descrizione")
     ) {
-      colData = riga.indexOf('data di inizio')
-      colDesc = riga.indexOf('descrizione')
-      colImporto = riga.indexOf('importo')
+      colData = riga.indexOf("data di inizio");
+      colDesc = riga.indexOf("descrizione");
+      colImporto = riga.indexOf("importo");
 
-      // Usiamo "Tipo" (es. Pagamento) come categoria banca provvisoria
-      colCategoria = riga.indexOf('tipo')
+      // Se esiste una colonna "categoria" di Revolut la usiamo come categoria_banca
+      if (riga.includes("categoria")) {
+        colCategoria = riga.indexOf("categoria");
+      } else {
+        // altrimenti usiamo "tipo" (Pagamento, Pagamento con carta, ecc.)
+        colCategoria = riga.indexOf("tipo");
+      }
 
-      // Cerchiamo lo stato per filtrare solo i completati
-      if (riga.includes('state')) colStato = riga.indexOf('state')
+      // stato / state (in alcuni CSV è "state", in altri "stato")
+      if (riga.includes("state")) {
+        colStato = riga.indexOf("state");
+      } else if (riga.includes("stato")) {
+        colStato = riga.indexOf("stato");
+      }
 
-      bancaRilevata = 'Revolut'
-      startRow = i + 1
-      break
+      bancaRilevata = "Revolut";
+      startRow = i + 1;
+      break;
     }
 
-    // --- LOGICA INTESA / CARISBO (Standard precedente) ---
+    // ---------- LOGICA INTESA / CARISBO ----------
     if (
-      riga.includes('data') &&
-      (riga.includes('dettagli') || riga.includes('descrizione')) &&
-      riga.includes('importo') &&
-      !riga.includes('data di inizio')
+      riga.includes("data") &&
+      (riga.includes("dettagli") || riga.includes("descrizione")) &&
+      riga.includes("importo") &&
+      !riga.includes("data di inizio") // per non confonderla con Revolut
     ) {
-      colData = riga.indexOf('data')
+      colData = riga.indexOf("data");
       colDesc =
-        riga.indexOf('dettagli') > -1
-          ? riga.indexOf('dettagli')
-          : riga.indexOf('descrizione')
-      colImporto = riga.indexOf('importo')
+        riga.indexOf("dettagli") > -1
+          ? riga.indexOf("dettagli")
+          : riga.indexOf("descrizione");
 
-      if (riga.includes('categoria')) colCategoria = riga.indexOf('categoria')
-      else if (riga.includes('voce di spesa'))
-        colCategoria = riga.indexOf('voce di spesa')
+      colImporto = riga.indexOf("importo");
 
-      bancaRilevata = 'Intesa Sanpaolo'
-      startRow = i + 1
-      break
+      if (riga.includes("categoria")) {
+        colCategoria = riga.indexOf("categoria");
+      } else if (riga.includes("voce di spesa")) {
+        colCategoria = riga.indexOf("voce di spesa");
+      }
+
+      bancaRilevata = "Intesa Sanpaolo";
+      startRow = i + 1;
+      break;
     }
   }
 
-  // Fallback se non trova nulla
+  // ---------- FALLBACK GENERICO ----------
   if (colData === -1) {
-    colData = 0
-    colDesc = 1
-    colImporto = 2
-    startRow = 0
-    bancaRilevata = 'Sconosciuta'
+    colData = 0;
+    colDesc = 1;
+    colImporto = 2;
+    startRow = 0;
+    bancaRilevata = "Sconosciuta";
   }
 
-  // 2. ESTRAZIONE DATI
-  const movimenti = []
+  // 2) ESTRAZIONE MOVIMENTI
+  const movimenti = [];
 
   for (let i = startRow; i < rows.length; i++) {
-    const r = rows[i]
+    const r = rows[i] || [];
 
-    // Controllo sicurezza
-    if (!r[colData]) continue
+    if (!r[colData]) continue;
 
-    // --- FILTRO STATO (Solo per Revolut) ---
-    // Se c'è la colonna stato, e il valore NON è "COMPLETATO" (o COMPLETED), saltiamo la riga
+    // --- FILTRO STATO SOLO PER REVOLUT ---
     if (colStato > -1) {
-      const stato = String(r[colStato]).toUpperCase()
-      if (stato !== 'COMPLETATO' && stato !== 'COMPLETED') continue
+      const stato = String(r[colStato] || "")
+        .toUpperCase()
+        .trim();
+      if (stato && stato !== "COMPLETATO" && stato !== "COMPLETED") continue;
     }
 
-    let dataObj = parseDate(r[colData])
-    if (!dataObj) continue
+    const dataObj = parseDate(r[colData]);
+    if (!dataObj) continue;
 
-    let importo = parseMoney(r[colImporto])
-    if (isNaN(importo) || importo === 0) continue
+    const importo = parseMoney(r[colImporto]);
+    if (isNaN(importo) || importo === 0) continue;
 
-    let desc = r[colDesc] || 'Nessuna descrizione'
+    const desc = r[colDesc] || "Nessuna descrizione";
 
-    // RECUPERO CATEGORIA (dalla banca)
-    let catBanca = 'Da Classificare'
+    // CATEGORIA DELLA BANCA (Revolut / Intesa)
+    let catBanca = "Da Classificare";
     if (colCategoria > -1 && r[colCategoria]) {
-      catBanca = toTitleCase(String(r[colCategoria]))
+      catBanca = toTitleCase(String(r[colCategoria]));
     }
 
-    // 👇 QUI l'oggetto movimento aggiornato
     movimenti.push({
-      data: dataObj.toISOString().split('T')[0], // YYYY-MM-DD
+      data: dataObj.toISOString().split("T")[0], // YYYY-MM-DD
       descrizione: cleanText(desc),
-      importo: importo,
-      tipo: importo < 0 ? 'Uscita' : 'Entrata',
+      importo,
+      tipo: importo < 0 ? "Uscita" : "Entrata",
+
+      // il conto reale (es. "Revolut Salvo") viene impostato in ImportaView
       conto: bancaRilevata,
 
-      // --- NUOVI CAMPI PER LE CATEGORIE ---
-      categoria_banca: catBanca, // testo della banca
-      categoria_id: null,        // sarà riempito dal RuleEngine
-      categoria: null            // nome "pulito" della categoria interna
-    })
+      categoria_banca: catBanca, // <- qui finiscono "Ricarica", "Pagamento", "Commissione", ecc.
+      categoria_id: null,
+      categoria: null,
+    });
   }
 
-  return { banca: bancaRilevata, movimenti }
+  return { banca: bancaRilevata, movimenti };
 }
 
-// --- HELPER DATE ---
+// =============================
+// HELPER DATE
+// =============================
 function parseDate(raw) {
-  if (raw instanceof Date) return raw
-  const str = String(raw).trim()
+  if (raw instanceof Date) return raw;
+  const str = String(raw).trim();
 
-  // Gestione formato Revolut: "2024-03-13 21:38:38"
-  // Basta prendere la parte prima dello spazio se è in formato ISO
-  if (str.includes('-')) {
-    const dataPura = str.split(' ')[0] // Prende "2024-03-13"
-    return new Date(dataPura)
+  // Formato tipo Revolut: "2024-12-20 11:02:41"
+  if (str.includes("-")) {
+    const dataPura = str.split(" ")[0];
+    const d = new Date(dataPura);
+    if (!isNaN(d.getTime())) return d;
   }
 
-  // Gestione formato Italiano: "13/03/2024"
-  if (str.includes('/')) {
-    const parts = str.split(' ')[0].split('/') // Prende prima dello spazio, poi splitta
-    if (parts.length === 3) return new Date(parts[2], parts[1] - 1, parts[0])
+  // Formato italiano: "20/12/2024"
+  if (str.includes("/")) {
+    const soloData = str.split(" ")[0];
+    const parts = soloData.split("/");
+    if (parts.length === 3) {
+      const d = new Date(parts[2], parts[1] - 1, parts[0]);
+      if (!isNaN(d.getTime())) return d;
+    }
   }
 
-  return null
+  return null;
 }
 
-// --- HELPER SOLDI ---
+// =============================
+// HELPER SOLDI
+// =============================
 function parseMoney(raw) {
-  if (typeof raw === 'number') return raw
-  let str = String(raw).trim().replace('€', '').replace('$', '').trim()
+  if (typeof raw === "number") return raw;
 
-  // Gestione standard CSV internazionale (punto per decimali)
-  // Revolut nel CSV usa "40.00" (punto)
-  if (str.includes('.') && !str.includes(',')) {
-    return parseFloat(str)
+  let str = String(raw).trim();
+  str = str.replace("€", "").replace("$", "").trim();
+
+  // Formato internazionale: "1500.00"
+  if (str.includes(".") && !str.includes(",")) {
+    const n = parseFloat(str);
+    return isNaN(n) ? 0 : n;
   }
 
-  // Gestione Italiana (1.000,00)
-  if (str.includes(',') && str.includes('.')) {
-    str = str.replace(/\./g, '').replace(',', '.')
-  } else if (str.includes(',')) {
-    str = str.replace(',', '.')
+  // Formato italiano: "1.500,00"
+  if (str.includes(",") && str.includes(".")) {
+    str = str.replace(/\./g, "").replace(",", ".");
+  } else if (str.includes(",")) {
+    str = str.replace(",", ".");
   }
-  return parseFloat(str)
+
+  const n = parseFloat(str);
+  return isNaN(n) ? 0 : n;
 }
 
+// =============================
+// HELPER TESTO
+// =============================
 function cleanText(txt) {
-  return String(txt).trim().replace(/\s+/g, ' ')
+  return String(txt).trim().replace(/\s+/g, " ");
 }
 
 function toTitleCase(str) {
-  if (!str) return 'Da Classificare'
-  str = str.trim().toLowerCase()
-  if (str === '' || str === '-') return 'Da Classificare'
-  return str.charAt(0).toUpperCase() + str.slice(1)
+  if (!str) return "Da Classificare";
+  str = str.trim().toLowerCase();
+  if (str === "" || str === "-") return "Da Classificare";
+  return str.charAt(0).toUpperCase() + str.slice(1);
 }

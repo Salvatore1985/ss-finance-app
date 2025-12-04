@@ -1,250 +1,216 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed } from 'vue'
 
 const props = defineProps({
-  movimento: { type: Object, required: true },
-  expanded: { type: Boolean, default: false }, // usato da Storico se serve
-  showTags: { type: Boolean, default: false },
-  showAttachments: { type: Boolean, default: false },
-  dateVariant: { type: String, default: 'short' },
-  amountMode: { type: String, default: 'sign-by-type' }
+  movimento: {
+    type: Object,
+    required: true
+  },
+  // già usati nella tua pagina (li supportiamo per compatibilità)
+  showTags: {
+    type: Boolean,
+    default: true
+  },
+  showAttachments: {
+    type: Boolean,
+    default: false
+  },
+  // nuovo: se vuoi nascondere la categoria banca
+  showCategoriaBanca: {
+    type: Boolean,
+    default: true
+  }
 })
 
-const emit = defineEmits(['toggle'])
+const isEntrata = computed(() => Number(props.movimento.importo) > 0)
 
-// --- STATO LOCALE PER LA DESCRIZIONE (chiusa/aperta) ---
-const isExpanded = ref(props.expanded)
-
-watch(
-  () => props.expanded,
-  (v) => { isExpanded.value = v }
-)
-
-const toggleDescription = () => {
-  isExpanded.value = !isExpanded.value
-  emit('toggle')
-}
-
-// --- ICONA TONDA ---
-const iconWrapperClass = computed(() => {
-  if (props.movimento?.tipo === 'Entrata') {
-    return 'bg-success bg-opacity-10 text-success'
-  }
-  if (props.movimento?.tipo === 'Uscita') {
-    return 'bg-primary bg-opacity-10 text-primary'
-  }
-  return 'bg-light text-muted'
+const importoFormatted = computed(() => {
+  const val = Number(props.movimento.importo) || 0
+  return new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 2
+  }).format(val)
 })
 
-const iconClass = computed(() =>
-  props.movimento?.tipo === 'Entrata'
-    ? 'bi-piggy-bank-fill'
-    : 'bi-bag-fill'
-)
-
-// --- IMPORTO ---
-const amountClass = computed(() =>
-  props.movimento?.tipo === 'Uscita' ? 'text-dark' : 'text-success'
-)
-
-const formattedAmount = computed(() => {
-  const value = parseFloat(props.movimento?.importo || 0)
-
-  if (props.amountMode === 'raw') {
-    return value.toFixed(2)
+const dataFormatted = computed(() => {
+  if (!props.movimento.data) return ''
+  try {
+    const d = new Date(props.movimento.data)
+    if (Number.isNaN(d.getTime())) return props.movimento.data
+    return d.toLocaleDateString('it-IT')
+  } catch {
+    return props.movimento.data
   }
-
-  const sign = props.movimento?.tipo === 'Uscita' ? '-' : '+'
-  return `${sign} ${Math.abs(value).toFixed(2)}`
 })
 
-// --- DATA ---
-const formattedDate = computed(() => {
-  const raw =
-    props.movimento?.data ||
-    props.movimento?.data_movimento ||
-    props.movimento?.created_at
+const categoriaLabel = computed(() => {
+  // categoria "interna" (tabella categorie)
+  return props.movimento.categoria || 'Da classificare'
+})
 
-  if (!raw) return ''
+const categoriaBancaLabel = computed(() => {
+  return props.movimento.categoria_banca || null
+})
 
-  const d = new Date(raw)
+const contoLabel = computed(() => props.movimento.conto || '')
 
-  if (props.dateVariant === 'long') {
-    return d.toLocaleDateString('it-IT', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'long'
-    })
+// Normalizziamo i tag (può essere array, stringa JSON, stringa singola, null)
+const tagsList = computed(() => {
+  const raw = props.movimento.tags
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+    // se è una stringa tipo '["Yaris","Panda"]'
+    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+        (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) return parsed
+        return [trimmed]
+      } catch {
+        return [trimmed]
+      }
+    }
+    return [trimmed]
   }
 
-  return d.toLocaleDateString('it-IT')
+  return []
 })
 </script>
 
 <template>
-  <div class="movimento-card w-100">
-    <div class="row-main d-flex align-items-start w-100">
-      <!-- DATA A SINISTRA -->
-      <div class="mov-date small text-muted me-3">
-        {{ formattedDate }}
+  <div class="mov-row d-flex align-items-start justify-content-between gap-3">
+    <!-- COLONNA SINISTRA: data, descrizione, categorie, tag -->
+    <div class="flex-grow-1 min-w-0">
+      <!-- data + tipo + conto -->
+      <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+        <span class="mov-date text-muted small">
+          {{ dataFormatted }}
+        </span>
+
+        <span
+          class="badge rounded-pill mov-badge-tipo"
+          :class="isEntrata ? 'mov-badge-entrata' : 'mov-badge-uscita'"
+        >
+          {{ movimento.tipo || (isEntrata ? 'Entrata' : 'Uscita') }}
+        </span>
+
+        <span
+          v-if="contoLabel"
+          class="badge rounded-pill bg-light border text-muted small"
+        >
+          {{ contoLabel }}
+        </span>
       </div>
 
-      <!-- ICONA + TESTO -->
-      <div class="mov-center d-flex align-items-start flex-grow-1 min-width-0 gap-3">
-        <!-- ICONA TONDA -->
-        <div class="movement-icon shadow-sm flex-shrink-0" :class="iconWrapperClass">
-          <i class="bi fs-5" :class="iconClass"></i>
-        </div>
+      <!-- descrizione -->
+      <div class="fw-semibold text-truncate mb-1">
+        {{ movimento.descrizione }}
+      </div>
 
-        <!-- TESTO -->
-        <div class="flex-grow-1 min-width-0">
-          <!-- DESCRIZIONE (cliccabile, identica al vecchio HTML) -->
-          <div class="d-flex">
-            <div class="flex-grow-1 min-width-0">
-              <div
-                class="fw-bold text-dark mb-1"
-                :class="isExpanded ? 'text-wrap' : 'text-truncate'"
-                style="max-width: 220px; cursor: pointer;"
-                @click="toggleDescription"
-              >
-                {{ movimento.descrizione }}
-              </div>
-            </div>
-          </div>
+      <!-- categorie + tag -->
+      <div class="d-flex flex-wrap gap-1 align-items-center small">
+        <!-- categoria interna -->
+        <span
+          class="badge rounded-pill mov-badge-cat-int"
+          v-if="categoriaLabel"
+        >
+          {{ categoriaLabel }}
+        </span>
 
-          <!-- META: CONTO, CATEGORIA, TAG, NOTE, ALLEGATI -->
-          <div class="mov-meta d-flex align-items-center flex-wrap gap-2 mt-1">
-            <span v-if="movimento.conto" class="badge badge-soft border">
-              <i class="bi bi-bank2 me-1 text-muted"></i> {{ movimento.conto }}
+        <!-- categoria banca (solo se diversa da categoria interna) -->
+        <span
+          v-if="
+            showCategoriaBanca &&
+            categoriaBancaLabel &&
+            categoriaBancaLabel !== categoriaLabel
+          "
+          class="badge rounded-pill mov-badge-cat-banca"
+        >
+          {{ categoriaBancaLabel }}
+        </span>
+
+        <!-- tag -->
+        <span
+          v-if="showTags && tagsList.length">
+          <span
+            v-for="tag in tagsList"
+            :key="tag"
+            class="badge rounded-pill mov-badge-tag"
+          >
+            #{{ tag }}
             </span>
+        </span>
+      </div>
+    </div>
 
-            <span v-if="movimento.categoria" class="badge badge-soft border">
-              {{ movimento.categoria }}
-            </span>
-
-            <!-- TAG -->
-            <template v-if="showTags && movimento.tags?.length">
-              <span
-                v-for="tag in movimento.tags"
-                :key="tag"
-                class="badge badge-tag text-dark border"
-              >
-                <i class="bi bi-tag-fill me-1 opacity-50"></i> {{ tag }}
-              </span>
-            </template>
-
-            <!-- NOTE / ALLEGATI -->
-            <i
-              v-if="showAttachments && movimento.note"
-              class="bi bi-sticky-fill text-warning ms-1"
-              title="Note"
-            ></i>
-            <i
-              v-if="showAttachments && movimento.file_url"
-              class="bi bi-paperclip text-secondary ms-1"
-              title="Allegato"
-            ></i>
-          </div>
-        </div>
+    <!-- COLONNA DESTRA: importo + azioni -->
+    <div
+      class="flex-shrink-0 text-end d-flex flex-column align-items-end gap-2"
+    >
+      <div
+        class="fw-bold mov-importo"
+        :class="isEntrata ? 'text-success' : 'text-danger'"
+      >
+        {{ importoFormatted }}
       </div>
 
-      <!-- IMPORTO + AZIONI A DESTRA -->
-      <div class="mov-right d-flex align-items-center flex-shrink-0 gap-2 ms-auto">
-        <div class="text-end">
-          <div class="fw-bold text-nowrap fs-6" :class="amountClass">
-            {{ formattedAmount }} €
-          </div>
-        </div>
-
-        <div v-if="$slots.actions" class="d-flex gap-2 actions-row">
-          <slot name="actions" />
-        </div>
-      </div>
+      <!-- slot per pulsanti azione (vedi MovimentiView) -->
+      <slot name="actions"></slot>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* CARD BASE */
-.movimento-card {
-  background: #fff;
-  padding: 0.5rem 0.75rem;
+.mov-row {
+  cursor: default;
 }
 
-/* RIGA PRINCIPALE */
-.row-main {
-  gap: 0.75rem;
-  flex-wrap: nowrap;
-}
-
-/* DATA A SINISTRA */
+/* data */
 .mov-date {
-  white-space: nowrap;
-}
-
-/* BLOCCO CENTRALE (icona + testo) */
-.mov-center {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-/* ICONA TONDA */
-.movement-icon {
-  width: 45px;
-  height: 45px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* META SOTTO LA DESCRIZIONE */
-.mov-meta {
   font-size: 0.75rem;
 }
 
-/* Badge grigio (conto/categoria) */
-.badge-soft {
-  background-color: #f8fafc;
-  color: #475569;
-  border-color: #e2e8f0 !important;
-  font-weight: 500;
-  font-size: 0.75rem;
-}
-
-/* Badge giallo (tag) */
-.badge-tag {
-  background-color: #fef9c3;
-  border-color: #fde047 !important;
-  color: #854d0e !important;
-  font-weight: 600;
+/* badge tipo Entrata/Uscita */
+.mov-badge-tipo {
   font-size: 0.7rem;
-  border-radius: 6px;
-  padding: 4px 8px;
+  padding: 0.15rem 0.5rem;
+}
+.mov-badge-entrata {
+  background: rgba(16, 185, 129, 0.1);
+  color: #059669;
+}
+.mov-badge-uscita {
+  background: rgba(239, 68, 68, 0.1);
+  color: #dc2626;
 }
 
-/* BLOCCO IMPORTO + AZIONI */
-.mov-right {
-  gap: 0.5rem;
-  flex-shrink: 0;
+/* categoria interna */
+.mov-badge-cat-int {
+  background: rgba(59, 130, 246, 0.1);
+  color: #1d4ed8;
 }
 
-/* GRUPPO AZIONI */
-.actions-row {
-  display: flex;
-  gap: 0.25rem;
+/* categoria banca */
+.mov-badge-cat-banca {
+  background: #f8fafc;
+  border: 1px solid #e5e7eb;
+  color: #4b5563;
 }
 
-/* Mobile: importo + azioni vanno in basso a destra */
-@media (max-width: 767.98px) {
-  .row-main {
-    flex-wrap: wrap;
-  }
+/* tag */
+.mov-badge-tag {
+  background: rgba(14, 165, 233, 0.08);
+  color: #0369a1;
+  font-weight: 500;
+}
 
-  .mov-right {
-    width: 100%;
-    justify-content: flex-end;
-    margin-top: 0.5rem;
-  }
+/* importo */
+.mov-importo {
+  font-size: 0.95rem;
 }
 </style>

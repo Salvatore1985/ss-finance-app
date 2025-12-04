@@ -16,6 +16,50 @@ const listaTag = ref([])
 const editForm = ref({ tags: [] })
 const splitForm = ref({ amount: '', category: '' })
 
+// --- LABEL CATEGORIA (interna o banca) ---
+const categoriaLabel = computed(() => {
+  if (!movimento.value) return '—'
+  // prima la categoria interna, se esiste
+  return (
+    movimento.value.categoria ||
+    movimento.value.categoria_banca ||
+    '—'
+  )
+})
+
+// --- NORMALIZZA TAG (array, stringa, JSON, ecc.) ---
+function normalizeTags(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw
+
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim()
+    if (!trimmed) return []
+
+    if (
+      (trimmed.startsWith('[') && trimmed.endsWith(']')) ||
+      (trimmed.startsWith('{') && trimmed.endsWith('}'))
+    ) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) return parsed
+        return [trimmed]
+      } catch {
+        return [trimmed]
+      }
+    }
+
+    return [trimmed]
+  }
+
+  return []
+}
+
+const tagsList = computed(() =>
+  normalizeTags(movimento.value?.tags)
+)
+
+
 // Caricamento Dati all'avvio
 onMounted(async () => {
   const { data: c } = await supabase.from('conti').select('nome').order('nome')
@@ -38,14 +82,18 @@ const splitRimanente = computed(() => {
 const apri = (mov, modalitaIniziale = 'view') => {
   movimento.value = mov
   mode.value = modalitaIniziale
-  
-  editForm.value = { ...mov, tags: mov.tags || [] }
+
+  editForm.value = {
+    ...mov,
+    tags: normalizeTags(mov.tags)
+  }
   splitForm.value = { amount: '', category: '' }
 
   const el = document.getElementById('modalDettaglio')
   const modal = new Modal(el)
   modal.show()
 }
+
 
 defineExpose({ apri })
 
@@ -155,23 +203,35 @@ const chiudiEaggiorna = () => {
           <!-- VISTA -->
           <div v-if="mode === 'view'">
             <h5 class="fw-bold mb-3 text-dark">{{ movimento?.descrizione }}</h5>
-            <div class="row g-3 mb-4">
-              <div class="col-6">
-                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Categoria</small>
-                <div class="fw-medium text-dark"><i class="bi bi-grid-fill me-1 text-secondary"></i> {{ movimento?.categoria }}</div>
-              </div>
-              <div class="col-6">
-                <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Conto</small>
-                <div class="fw-medium text-dark"><i class="bi bi-bank2 me-1 text-secondary"></i> {{ movimento?.conto }}</div>
+          <div class="row g-3 mb-4">
+            <div class="col-6">
+              <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Categoria</small>
+              <div class="fw-medium text-dark">
+                <i class="bi bi-grid-fill me-1 text-secondary"></i>
+                {{ categoriaLabel }}
               </div>
             </div>
-            
+            <div class="col-6">
+              <small class="text-muted fw-bold text-uppercase" style="font-size: 0.7rem;">Conto</small>
+              <div class="fw-medium text-dark">
+                <i class="bi bi-bank2 me-1 text-secondary"></i>
+                {{ movimento?.conto }}
+              </div>
+            </div>
+          </div>
+
             <!-- TAG VISTA -->
-            <div class="mb-4" v-if="movimento?.tags && movimento.tags.length > 0">
-               <div class="d-flex flex-wrap gap-2">
-                 <span v-for="t in movimento.tags" :key="t" class="badge bg-warning text-dark border border-warning rounded-pill">#{{ t }}</span>
-               </div>
+          <div class="mb-4" v-if="tagsList.length > 0">
+            <div class="d-flex flex-wrap gap-2">
+              <span
+                v-for="t in tagsList"
+                :key="t"
+                class="badge bg-warning text-dark border border-warning rounded-pill"
+              >
+                #{{ t }}
+              </span>
             </div>
+          </div>
 
             <div class="d-grid gap-2">
               <button @click="mode = 'edit'" class="btn btn-outline-dark fw-bold py-2 rounded-3"><i class="bi bi-pencil me-2"></i> Modifica</button>

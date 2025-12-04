@@ -1,6 +1,5 @@
 <template>
   <div id="app-shell">
-    
     <!-- HEADER DESKTOP -->
     <header class="app-header d-none d-lg-block">
       <Header />
@@ -14,28 +13,25 @@
         </span>
         <div
           class="avatar-small bg-primary text-white rounded-circle d-flex align-items-center justify-content-center"
-          style="width:32px;height:32px;"
+          style="width: 32px; height: 32px;"
         >
           S
         </div>
       </div>
     </header>
 
-    <!-- CONTENUTO CENTRALE (senza scroll, passa 100% spazio alla pagina) -->
-    <div class="app-content">
-      <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" />
-        </transition>
-      </router-view>
-    </div>
+    <!-- CONTENUTO PAGINE -->
+    <main class="app-content">
+      <!-- niente transition per ora: montiamo direttamente la pagina -->
+      <router-view />
+    </main>
 
     <!-- FOOTER MOBILE -->
     <footer class="app-footer d-lg-none">
       <Footer />
     </footer>
 
-    <!-- MODALE GLOBALE -->
+    <!-- Modale globale nuovo movimento (se lo usi così) -->
     <NuovoMovimento />
   </div>
 </template>
@@ -47,28 +43,31 @@ import NuovoMovimento from '@/components/Movimenti/NuovoMovimento.vue'
 </script>
 
 <style>
-/* RESET GLOBALE / FULLSCREEN WEBAPP */
+/* RESET GLOBALE */
 * {
   box-sizing: border-box;
 }
 
+/* il contenitore root che crea Vue */
 html,
-body {
+body,
+#app {
   margin: 0;
   padding: 0;
-  width: 100vw;
-  height: 100vh;
-  overflow: hidden; /* ❌ niente scroll del browser */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   background-color: #f8fafc;
-  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', sans-serif;
 }
 
 /* LAYOUT A COLONNA: Header -> Content -> Footer */
 #app-shell {
   display: flex;
   flex-direction: column;
-  width: 100vw;
-  height: 100vh; /* riempie tutto lo schermo */
+  height: 100%;
+  width: 100%;
 }
 
 /* Header Desktop */
@@ -89,23 +88,14 @@ body {
   z-index: 50;
 }
 
-/* AREA CONTENUTO
-   - prende tutto lo spazio tra header e footer
-   - niente scroll
-   - il figlio (pagina) si stira a 100% */
+/* Area Contenuto (riempie tutto) */
 .app-content {
   flex: 1 1 auto;
-  position: relative;
-  overflow: hidden;   /* niente scroll globale */
-  display: flex;      /* permette al figlio di riempire l'area */
-  min-height: 0;
-}
-
-/* Il componente caricato dal router-view riempie l'area centrale */
-.app-content > * {
-  flex: 1 1 auto;
+  min-height: 0;          /* importante per far funzionare bene lo scroll interno delle pagine */
   min-width: 0;
-  min-height: 0;
+  position: relative;
+  overflow: hidden;       /* lo scroll lo fanno le pagine interne (page-fixed-layout) */
+  background: #f4f7fb;    /* niente nero! */
 }
 
 /* Footer Mobile */
@@ -116,16 +106,5 @@ body {
   border-top: 1px solid #e2e8f0;
   z-index: 50;
   padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* Animazione fade tra le pagine */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

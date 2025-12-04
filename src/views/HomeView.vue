@@ -75,8 +75,6 @@
         </button>
       </div>
 
-
-
       <!-- VISUALIZZAZIONE -->
       <div class="sidebar-block">
         <div class="sidebar-label">Visualizzazione</div>
@@ -110,7 +108,7 @@
 
     <!-- AREA PRINCIPALE -->
     <main class="dashboard-main">
-      <!-- RIGA KPI: usa il componente che abbiamo già creato -->
+      <!-- RIGA KPI -->
       <section class="row-kpi">
         <DashboardKpis :active-user="activeUser" />
       </section>
@@ -123,14 +121,29 @@
         />
       </section>
 
-      <!-- RIGA LISTA + EXTRA -->
+      <!-- RIGA LISTA + EXTRA + COLONNA DX -->
       <section class="row-bottom">
-        <DashboardList
-          :active-user="activeUser"
-          :view="selectedView"
-        />
-        <div class="dash-box extra-box">
+        <!-- COLONNA 1: LISTA MOVIMENTI (SCORREVOLE) -->
+        <div class="col-bottom col-bottom-list">
+          <DashboardList
+            :active-user="activeUser"
+            :view="selectedView"
+          />
+        </div>
+
+        <!-- COLONNA 2: INSIGHT RAPIDI (DashboardExtra) -->
+        <div class="col-bottom col-bottom-extra">
           <DashboardExtra :active-user="activeUser" />
+        </div>
+
+        <!-- COLONNA 3: SPAZIO EXTRA A DESTRA -->
+        <div class="col-bottom col-bottom-right">
+          <div class="right-box">
+            <p class="right-title">Spazio extra</p>
+            <p class="right-subtitle">
+              Qui possiamo aggiungere un altro widget (es. categorie top, obiettivi, ecc.).
+            </p>
+          </div>
         </div>
       </section>
     </main>
@@ -139,13 +152,13 @@
 
 <script setup>
 import { ref } from 'vue'
-import DashboardKpis from '@/components/Dashboard/DashboardKpis.vue'
-import DashboardChart from '@/components/Dashboard/DashboardChart.vue'
-import DashboardList from '@/components/Dashboard/DashboardList.vue'
-import DashboardExtra from '@/components/Dashboard/DashboardExtra.vue'
+import DashboardKpis from '../components/Dashboard/DashboardKpis.vue'
+import DashboardChart from '../components/Dashboard/DashboardChart.vue'
+import DashboardList from '../components/Dashboard/DashboardList.vue'
+import DashboardExtra from '../components/Dashboard/DashboardExtra.vue'
 
 const activeUser = ref('all')          // 'all' | 'salvo' | 'sigi'
-const selectedView = ref('periodo')    // 'periodo' | 'conti' | 'tipo' | 'categorie'
+const selectedView = ref('periodo')    // 'periodo' | 'conti' | 'tipo' | 'categorie' | 'tag'
 const chartSection = ref(null)
 
 // quando cambio vista:
@@ -164,7 +177,7 @@ function setView (viewId) {
 </script>
 
 <style scoped>
-/* ROOT DELLA PAGINA: riempie tutta l'area app-content */
+/* ROOT DELLA PAGINA: riempie tutta l'area app */
 .dashboard-layout {
   width: 100%;
   height: 100%;
@@ -277,6 +290,7 @@ function setView (viewId) {
   flex: 1 1 0;
 }
 
+/* RIGA INFERIORE: 3 COLONNE */
 .row-bottom {
   flex: 1 1 0;
   display: flex;
@@ -284,20 +298,54 @@ function setView (viewId) {
   min-height: 0;
 }
 
-/* Card placeholder (grafico/lista/extra) */
-.dash-box {
-  flex: 1 1 0;
+.col-bottom {
   min-width: 0;
   min-height: 0;
-  border-radius: 12px;
-  border: 2px solid red;
-  background: rgba(255, 255, 255, 0.7);
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+}
+
+/* 3 colonne da 1/3 ciascuna */
+.col-bottom-list,
+.col-bottom-extra,
+.col-bottom-right {
+  flex: 0 0 33.3333%;
+  max-width: 33.3333%;
+}
+
+/* LISTA SCORREVOLE DENTRO LA SUA COLONNA */
+.col-bottom-list {
+  overflow-y: auto;
+}
+
+/* INSIGHT RAPIDI: contenitore “pulito” senza bordo rosso */
+.col-bottom-extra {
+  /* niente bordo rosso, il look lo dà il contenuto di DashboardExtra */
+}
+
+/* COLONNA DESTRA: placeholder */
+.right-box {
+  flex: 1 1 auto;
+  border-radius: 16px;
+  background: #f9fafb;
+  border: 1px dashed #e5e7eb;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.right-title {
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.right-subtitle {
+  font-size: 0.8rem;
   color: #6b7280;
+  margin: 0;
 }
 
 /* RESPONSIVE */
@@ -343,22 +391,27 @@ function setView (viewId) {
   .row-kpi,
   .row-chart,
   .row-bottom {
-    flex: 0 0 auto;   
-    min-height: auto; 
+    flex: 0 0 auto;
+    min-height: auto;
   }
-
 
   .row-bottom {
     flex-wrap: wrap;
   }
 
-  .row-bottom .extra-box {
+  /* su schermi più stretti le colonne vanno una sotto l'altra */
+  .col-bottom-list,
+  .col-bottom-extra,
+  .col-bottom-right {
     flex: 1 1 100%;
+    max-width: 100%;
   }
 }
 
 @media (max-width: 576px) {
-  .row-bottom .extra-box {
+  /* su smartphone mostriamo solo la lista, nascondiamo le altre due colonne */
+  .col-bottom-extra,
+  .col-bottom-right {
     display: none;
   }
 }
