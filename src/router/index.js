@@ -52,33 +52,62 @@ const router = createRouter({
   ],
 });
 
+// Recupero della sessione con un piccolo timeout di fallback per evitare
+// blocchi infiniti se Supabase non risponde.
+async function getSessionWithTimeout(timeoutMs = 3500) {
+  const timeoutPromise = new Promise((resolve) =>
+    setTimeout(
+      () =>
+        resolve({
+          data: { session: null },
+          error: new Error("Session timeout"),
+        }),
+      timeoutMs
+    )
+  );
+
+  try {
+    return await Promise.race([supabase.auth.getSession(), timeoutPromise]);
+  } catch (error) {
+    return { data: { session: null }, error };
+  }
+}
+
 // Tutto tranne /login richiede un utente loggato
 router.beforeEach(async (to, from, next) => {
-  // Pagina pubblica
-  if (to.name === "login") {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    // Se sei già loggato e provi ad andare su /login → torna in app
-    if (user) {
-      return next({ name: from.name || "dashboard" });
-    }
-    return next();
-  }
+  try {
+    const { data, error: sessionError } = await getSessionWithTimeout();
+    const session = data?.session;
 
-  // Per tutte le altre pagine serve il login
-  const {
-    data: { user },
-    error,
-  } = await supabase.auth.getUser();
-  if (error) {
+    if (sessionError) {
+      console.error("Errore auth guard", sessionError);
+    }
+
+    const user = session?.user || null;
+
+    // Pagina pubblica
+    if (to.name === "login") {
+      // Se sei già loggato e provi ad andare su /login → torna in app
+      if (user) {
+        return next({ name: from.name || "dashboard" });
+      }
+      return next();
+    }
+
+    // Per tutte le altre pagine serve il login
+    if (!user) {
+      return next({ name: "login" });
+    }
+
+    return next();
+  } catch (error) {
     console.error("Errore auth guard", error);
-  }
-  if (!user) {
+    // in caso di problemi imprevisti torno alla login per evitare blocchi di navigazione
+    if (to.name === "login") {
+      return next();
+    }
     return next({ name: "login" });
   }
-
-  next();
 });
 
 export default router;

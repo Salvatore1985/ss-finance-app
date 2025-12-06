@@ -4,12 +4,14 @@ import { supabase } from "../supabase";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+
 const email = ref("");
 const password = ref("");
 const showPassword = ref(false);
 const rememberMe = ref(false);
 const loading = ref(false);
 const errorMsg = ref("");
+const oauthLoading = ref(false);
 
 const passwordFieldType = computed(() =>
   showPassword.value ? "text" : "password"
@@ -32,6 +34,29 @@ const handleLogin = async () => {
     errorMsg.value = "Email o password errati.";
   } finally {
     loading.value = false;
+  }
+};
+
+const handleOAuthLogin = async (provider) => {
+  try {
+    oauthLoading.value = true;
+    errorMsg.value = "";
+
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      throw error;
+    }
+  } catch (error) {
+    console.error("Errore OAuth", error);
+    errorMsg.value = "Accesso social non riuscito. Riprova.";
+  } finally {
+    oauthLoading.value = false;
   }
 };
 </script>
@@ -110,18 +135,35 @@ const handleLogin = async () => {
         </div>
 
         <div class="social-buttons">
-          <button type="button" class="btn social-btn google">
+          <button
+            type="button"
+            class="btn social-btn google"
+            :disabled="oauthLoading"
+            @click="handleOAuthLogin('google')"
+          >
             <img
               src="https://www.svgrepo.com/show/475656/google-color.svg"
               alt="Google"
             />
-            Google
+            {{ oauthLoading ? "Attendi..." : "Google" }}
           </button>
-          <button type="button" class="btn social-btn github">
-            <i class="bi bi-github"></i> GitHub
+          <button
+            type="button"
+            class="btn social-btn github"
+            :disabled="oauthLoading"
+            @click="handleOAuthLogin('github')"
+          >
+            <i class="bi bi-github"></i>
+            {{ oauthLoading ? "Attendi..." : "GitHub" }}
           </button>
-          <button type="button" class="btn social-btn linkedin">
-            <i class="bi bi-linkedin"></i> LinkedIn
+          <button
+            type="button"
+            class="btn social-btn linkedin"
+            :disabled="oauthLoading"
+            @click="handleOAuthLogin('linkedin')"
+          >
+            <i class="bi bi-linkedin"></i>
+            {{ oauthLoading ? "Attendi..." : "LinkedIn" }}
           </button>
         </div>
       </form>

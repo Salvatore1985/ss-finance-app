@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from "vue";
 import { useRouter } from "vue-router";
-import { supabase } from "@/supabase"; // usa '@/...' come negli altri file
+import { supabase } from "@/supabase"; // usa '@/...' come negli altri file␊
 
 const router = useRouter();
 
@@ -10,6 +10,7 @@ const profileName = ref(""); // es. "Salvo" / "Sigi"
 const avatarLetter = ref("U"); // lettera dentro il cerchio
 const loadingProfile = ref(false);
 const menuRef = ref(null);
+let authSubscription = null;
 
 const computeLetter = (name, email) => {
   if (name && name.trim().length) {
@@ -21,6 +22,11 @@ const computeLetter = (name, email) => {
   return "U";
 };
 
+const resetProfile = () => {
+  profileName.value = "";
+  avatarLetter.value = "U";
+};
+
 const loadProfile = async () => {
   loadingProfile.value = true;
   try {
@@ -29,8 +35,7 @@ const loadProfile = async () => {
       error,
     } = await supabase.auth.getUser();
     if (error || !user) {
-      profileName.value = "";
-      avatarLetter.value = "U";
+      resetProfile();
       return;
     }
 
@@ -48,6 +53,9 @@ const loadProfile = async () => {
     }
 
     avatarLetter.value = computeLetter(profileName.value, user.email);
+  } catch (e) {
+    console.error("Errore caricamento profilo", e);
+    resetProfile();
   } finally {
     loadingProfile.value = false;
   }
@@ -67,19 +75,31 @@ const handleClickOutside = (event) => {
 const logout = async () => {
   await supabase.auth.signOut();
   showMenu.value = false;
-  profileName.value = "";
-  avatarLetter.value = "U";
+  resetProfile();
   // Torno alla pagina di login
   router.push({ name: "login" });
 };
 
 onMounted(() => {
   loadProfile();
+
+  const { data } = supabase.auth.onAuthStateChange(async (event) => {
+    if (event === "SIGNED_OUT") {
+      resetProfile();
+      return;
+    }
+
+    // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED → aggiorno l'avatar
+    await loadProfile();
+  });
+
+  authSubscription = data?.subscription;
   document.addEventListener("click", handleClickOutside);
 });
 
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
+  authSubscription?.unsubscribe?.();
 });
 </script>
 
