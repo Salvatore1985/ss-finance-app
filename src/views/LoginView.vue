@@ -18,20 +18,41 @@ const passwordFieldType = computed(() =>
 );
 
 const handleLogin = async () => {
-  try {
-    loading.value = true;
-    errorMsg.value = "";
+  loading.value = true;
+  errorMsg.value = "";
 
-    const { error } = await supabase.auth.signInWithPassword({
+  // 1. DEBUG: Vediamo cosa stiamo inviando
+  console.log("Tentativo login con:", email.value, password.value);
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: email.value,
       password: password.value,
     });
 
-    if (error) throw error;
+    // 2. DEBUG: Se c'è errore, stampalo tutto
+    if (error) {
+      console.error("ERRORE SUPABASE DETTAGLIATO:", error);
+      // Spesso l'errore è "Email not confirmed"
+      throw error;
+    }
 
-    router.push("/");
+    console.log("Login riuscito:", data);
+
+    if (data?.session) {
+      router.push({ name: "dashboard" });
+    }
   } catch (error) {
-    errorMsg.value = "Email o password errati.";
+    // Mostra il messaggio vero invece di uno generico
+    console.error(error);
+
+    if (error.message === "Email not confirmed") {
+      errorMsg.value = "Devi confermare la tua email prima di accedere!";
+    } else if (error.message === "Invalid login credentials") {
+      errorMsg.value = "Email o password errati.";
+    } else {
+      errorMsg.value = "Errore: " + error.message;
+    }
   } finally {
     loading.value = false;
   }
@@ -230,13 +251,10 @@ const handleOAuthLogin = async (provider) => {
   font-size: 1rem;
 }
 
+/* Input: spazio per lucchetto a sinistra e occhio a destra */
 .input-wrapper .form-control {
-  padding-left: 40px;
-  height: 48px;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  background: #f9fafb;
-  transition: border-color 0.2s ease, background-color 0.2s ease;
+  padding-left: 38px; /* spazio per l'icona lock */
+  padding-right: 40px; /* spazio per l'occhio */
 }
 
 .input-wrapper .form-control:focus {
@@ -244,20 +262,38 @@ const handleOAuthLogin = async (provider) => {
   background-color: #fff;
   box-shadow: none;
 }
-
+/* Icona lucchetto a sinistra, dentro il campo */
+.input-wrapper > .bi-lock {
+  position: absolute;
+  left: 12px;
+  font-size: 16px;
+  pointer-events: none;
+  color: #6b7280;
+}
 .password-wrapper {
   gap: 0.5rem;
 }
 
+/* Bottone occhio a destra, centrato verticalmente e cliccabile */
 .toggle-password {
   position: absolute;
   right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
   border: none;
   background: transparent;
-  color: #6b7280;
-  padding: 0.3rem 0.5rem;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
-
+.toggle-password i {
+  font-size: 18px;
+  color: #6b7280;
+}
 .form-options {
   display: flex;
   justify-content: space-between;

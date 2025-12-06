@@ -1,118 +1,121 @@
 <script setup>
-import { RouterView } from "vue-router";
-
 import { computed } from "vue";
 import { useRoute } from "vue-router";
 
+// Componenti
 import Header from "./components/Layout/Header.vue";
 import Footer from "./components/Layout/Footer.vue";
 import NuovoMovimento from "./components/Movimenti/NuovoMovimento.vue";
 import AccountMenu from "./components/Layout/AccountMenu.vue";
 
 const route = useRoute();
-const hideChrome = computed(() => route.meta?.hideChrome);
+
+// Se siamo nel login (hideChrome: true), questa variabile diventa TRUE
+const hideChrome = computed(() => route.meta?.hideChrome === true);
 </script>
 
 <template>
   <div id="app-shell">
-    <!-- HEADER DESKTOP -->
+    <!-- HEADER DESKTOP (Nascosto se hideChrome è true) -->
     <header v-if="!hideChrome" class="app-header d-none d-lg-block">
       <Header />
     </header>
 
-    <!-- HEADER MOBILE -->
-    <header v-if="!hideChrome" class="app-header-mobile d-lg-none">
-      <div class="app-header-mobile-inner">
+    <!-- HEADER MOBILE (Nascosto se hideChrome è true) -->
+    <header v-if="!hideChrome" class="app-header-mobile d-lg-none shadow-sm">
+      <div class="app-header-mobile-inner container-fluid">
         <div class="d-flex align-items-center gap-2">
-          <i class="bi bi-wallet2 text-primary fs-5"></i>
-          <span class="fw-semibold text-primary">Finance</span>
+          <i class="bi bi-wallet2 text-primary fs-4"></i>
+          <span class="fw-bold text-dark tracking-tight">Finance</span>
         </div>
-
-        <!-- QUI il menu account (logout / cambio utente) -->
+        <!-- Menu Utente -->
         <AccountMenu />
       </div>
     </header>
 
     <!-- CONTENUTO PRINCIPALE -->
-    <!-- CONTENUTO PAGINE -->
-    <main :class="['app-content', { 'app-content-auth': hideChrome }]">
-      <!-- app-content -->
-      <!-- RouterView con key sulla route per forzare il remount della pagina -->
-      <router-view v-slot="{ Component, route }">
-        <transition name="fade" mode="out-in">
-          <component :is="Component" :key="route.fullPath" />
-        </transition>
+    <!-- 'auth-mode' centra il login, altrimenti usa layout normale -->
+    <main :class="['app-content', { 'auth-mode': hideChrome }]">
+      <!-- 
+         IL TRUCCO PER LA NAVIGAZIONE FLUIDA:
+         :key="route.fullPath" costringe Vue a ricaricare il componente 
+         quando cambi pagina. Risolve il problema del "Clear site data".
+      -->
+      <router-view v-slot="{ Component }">
+        <component :is="Component" :key="route.fullPath" />
       </router-view>
     </main>
 
-    <!-- FOOTER (TAB BAR) SOLO MOBILE -->
+    <!-- FOOTER MOBILE (Nascosto se hideChrome è true) -->
     <footer v-if="!hideChrome" class="app-footer d-lg-none">
       <Footer />
     </footer>
 
-    <!-- FAB "Nuovo movimento" (resta come prima) -->
+    <!-- FAB Pulsante + (Nascosto se hideChrome è true) -->
     <NuovoMovimento v-if="!hideChrome" />
   </div>
 </template>
 
 <style>
+/* CSS CRITICO PER IL LAYOUT */
 html,
-body,
+body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Blocca scroll pagina intera, scrolla solo main */
+  background-color: #f8f9fa;
+}
+
 #app {
   height: 100%;
 }
 
-/* Shell generale */
+/* Flex Column: Header in alto, Footer in basso, Main in mezzo */
 #app-shell {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background: #f4f7fb;
 }
 
-/* Header desktop */
-.app-header {
-  flex-shrink: 0;
-}
-
-/* Header mobile */
+.app-header,
 .app-header-mobile {
   flex-shrink: 0;
-  border-bottom: 1px solid #e2e8f0;
-  background: #ffffff;
+  background: white;
+  z-index: 1000;
+  position: relative;
 }
 
 .app-header-mobile-inner {
-  height: 56px;
-  padding: 0 1rem;
+  height: 60px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 1rem;
 }
 
-/* Area centrale con le view */
-.app-main {
-  flex: 1 1 auto;
-  overflow: hidden;
+/* Main scrollabile */
+.app-content {
+  flex: 1 1 auto; /* Occupa tutto lo spazio disponibile */
+  overflow-y: auto; /* Scrolla qui dentro */
+  overflow-x: hidden;
+  position: relative;
+  padding-bottom: 100px; /* Spazio extra per footer mobile */
 }
 
-.app-content-auth {
-  overflow: auto;
-  background: transparent;
+/* Stile speciale per Login: centra tutto */
+.auth-mode {
+  background: #ffffff;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-/* Footer mobile (tab bar in basso) */
 .app-footer {
   flex-shrink: 0;
-}
-
-/* Transizione base tra view */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+  background: white;
+  border-top: 1px solid #dee2e6;
+  z-index: 1000;
 }
 </style>

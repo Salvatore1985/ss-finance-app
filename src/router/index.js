@@ -1,14 +1,12 @@
-// src/router/index.js
 import { createRouter, createWebHistory } from "vue-router";
+import { supabase } from "../supabase";
 
-// Viste principali
+// Viste
 import HomeView from "../views/HomeView.vue";
 import MovimentiView from "../views/MovimentiView.vue";
 import StoricoView from "../views/StoricoView.vue";
 import ConfigView from "../views/ConfigView.vue";
 import LoginView from "../views/LoginView.vue";
-
-import { supabase } from "../supabase";
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -17,34 +15,39 @@ const router = createRouter({
       path: "/login",
       name: "login",
       component: LoginView,
-      meta: { hideChrome: true },
+      meta: { hideChrome: true }, // <--- FONDAMENTALE: Nasconde menu
     },
     {
       path: "/",
       name: "dashboard",
       component: HomeView,
+      meta: { requiresAuth: true },
     },
     {
       path: "/movimenti",
       name: "movimenti",
       component: MovimentiView,
+      meta: { requiresAuth: true },
     },
     {
-      path: "/storico", // Corrisponde a "Storico" nel menu
+      path: "/storico",
       name: "storico",
       component: StoricoView,
+      meta: { requiresAuth: true },
     },
     {
       path: "/config",
       name: "config",
       component: ConfigView,
+      meta: { requiresAuth: true },
     },
     {
       path: "/importa",
       name: "importa",
       component: () => import("../views/ImportaView.vue"),
+      meta: { requiresAuth: true },
     },
-    // qualsiasi altra cosa → dashboard
+    // Qualsiasi pagina non trovata -> Dashboard
     {
       path: "/:pathMatch(.*)*",
       redirect: "/",
@@ -52,61 +55,30 @@ const router = createRouter({
   ],
 });
 
-// Recupero della sessione con un piccolo timeout di fallback per evitare
-// blocchi infiniti se Supabase non risponde.
-async function getSessionWithTimeout(timeoutMs = 3500) {
-  const timeoutPromise = new Promise((resolve) =>
-    setTimeout(
-      () =>
-        resolve({
-          data: { session: null },
-          error: new Error("Session timeout"),
-        }),
-      timeoutMs
-    )
-  );
-
-  try {
-    return await Promise.race([supabase.auth.getSession(), timeoutPromise]);
-  } catch (error) {
-    return { data: { session: null }, error };
-  }
-}
-
-// Tutto tranne /login richiede un utente loggato
+// --- GUARDIA DI NAVIGAZIONE ---
+// Questo codice viene eseguito PRIMA di ogni cambio pagina
 router.beforeEach(async (to, from, next) => {
   try {
-    const { data, error: sessionError } = await getSessionWithTimeout();
+    // 1. Chiediamo a Supabase: "C'è una sessione attiva?"
+    const { data } = await supabase.auth.getSession();
     const session = data?.session;
 
-    if (sessionError) {
-      console.error("Errore auth guard", sessionError);
-    }
-
-    const user = session?.user || null;
-
-    // Pagina pubblica
-    if (to.name === "login") {
-      // Se sei già loggato e provi ad andare su /login → torna in app
-      if (user) {
-        return next({ name: from.name || "dashboard" });
-      }
-      return next();
-    }
-
-    // Per tutte le altre pagine serve il login
-    if (!user) {
+    // 2. Se la pagina richiede login (requiresAuth) e NON c'è sessione -> LOGIN
+    if (to.meta.requiresAuth && !session) {
       return next({ name: "login" });
     }
 
-    return next();
-  } catch (error) {
-    console.error("Errore auth guard", error);
-    // in caso di problemi imprevisti torno alla login per evitare blocchi di navigazione
-    if (to.name === "login") {
-      return next();
+    // 3. Se sono già loggato e provo ad andare al login -> DASHBOARD
+    if (to.name === "login" && session) {
+      return next({ name: "dashboard" });
     }
-    return next({ name: "login" });
+
+    // 4. Altrimenti vai dove devi andare
+    next();
+  } catch (error) {
+    console.error("Errore router:", error);
+    // In caso di errore grave, manda al login per sicurezza
+    next({ name: "login" });
   }
 });
 
