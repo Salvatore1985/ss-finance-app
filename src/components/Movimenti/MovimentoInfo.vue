@@ -1,128 +1,128 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from "vue";
 
 const props = defineProps({
   movimento: {
     type: Object,
-    required: true
+    required: true,
   },
-  // già usati nella tua pagina (li supportiamo per compatibilità)
   showTags: {
     type: Boolean,
-    default: true
+    default: false,
   },
-  showAttachments: {
-    type: Boolean,
-    default: false
-  },
-  // nuovo: se vuoi nascondere la categoria banca
   showCategoriaBanca: {
     type: Boolean,
-    default: true
-  }
-})
+    default: false,
+  },
+});
 
-const isEntrata = computed(() => Number(props.movimento.importo) > 0)
+// stato locale: descrizione intera / troncata
+const showFullDesc = ref(false);
 
-const importoFormatted = computed(() => {
-  const val = Number(props.movimento.importo) || 0
-  return new Intl.NumberFormat('it-IT', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2
-  }).format(val)
-})
+// --- FORMATTER SEMPLICI ---
+const dataLabel = computed(() => {
+  if (!props.movimento?.data) return "";
+  const d = new Date(props.movimento.data);
+  if (Number.isNaN(d.getTime())) return props.movimento.data;
+  const dd = String(d.getDate()).padStart(2, "0");
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const yyyy = d.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
+});
 
-const dataFormatted = computed(() => {
-  if (!props.movimento.data) return ''
-  try {
-    const d = new Date(props.movimento.data)
-    if (Number.isNaN(d.getTime())) return props.movimento.data
-    return d.toLocaleDateString('it-IT')
-  } catch {
-    return props.movimento.data
-  }
-})
+const importoLabel = computed(() => {
+  const val = Number(props.movimento?.importo || 0);
+  return (
+    val.toLocaleString("it-IT", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }) + " €"
+  );
+});
 
-const categoriaLabel = computed(() => {
-  // categoria "interna" (tabella categorie)
-  return props.movimento.categoria || 'Da classificare'
-})
+const isUscita = computed(() => {
+  return (props.movimento?.tipo || "").toLowerCase() === "uscita";
+});
 
-const categoriaBancaLabel = computed(() => {
-  return props.movimento.categoria_banca || null
-})
+const tipoLabel = computed(() => {
+  const t = (props.movimento?.tipo || "").toLowerCase();
+  if (!t) return "";
+  return t.charAt(0).toUpperCase() + t.slice(1);
+});
 
-const contoLabel = computed(() => props.movimento.conto || '')
+const contoLabel = computed(() => props.movimento?.conto || "");
 
-// Normalizziamo i tag (può essere array, stringa JSON, stringa singola, null)
+const categoriaLabel = computed(() => props.movimento?.categoria || "");
+
+const categoriaBancaLabel = computed(
+  () => props.movimento?.categoria_banca || ""
+);
+
+// Tags come array di stringhe
 const tagsList = computed(() => {
-  const raw = props.movimento.tags
-  if (!raw) return []
-  if (Array.isArray(raw)) return raw
-
-  if (typeof raw === 'string') {
-    const trimmed = raw.trim()
-    if (!trimmed) return []
-    // se è una stringa tipo '["Yaris","Panda"]'
-    if ((trimmed.startsWith('[') && trimmed.endsWith(']')) ||
-        (trimmed.startsWith('{') && trimmed.endsWith('}'))) {
-      try {
-        const parsed = JSON.parse(trimmed)
-        if (Array.isArray(parsed)) return parsed
-        return [trimmed]
-      } catch {
-        return [trimmed]
-      }
+  const t = props.movimento?.tags;
+  if (!t) return [];
+  if (Array.isArray(t)) return t;
+  if (typeof t === "string") {
+    try {
+      // se è JSON
+      const parsed = JSON.parse(t);
+      if (Array.isArray(parsed)) return parsed;
+    } catch (e) {
+      // altrimenti split su virgola
+      return t
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
-    return [trimmed]
   }
-
-  return []
-})
+  return [];
+});
 </script>
 
 <template>
-  <div class="mov-row d-flex align-items-start justify-content-between gap-3">
-    <!-- COLONNA SINISTRA: data, descrizione, categorie, tag -->
-    <div class="flex-grow-1 min-w-0">
+  <div class="mov-row">
+    <!-- COLONNA SINISTRA: data + descrizione + categorie / tag -->
+    <div class="mov-col-left">
       <!-- data + tipo + conto -->
-      <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
-        <span class="mov-date text-muted small">
-          {{ dataFormatted }}
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+        <span class="mov-data text-muted small">
+          {{ dataLabel }}
         </span>
 
         <span
+          v-if="tipoLabel"
           class="badge rounded-pill mov-badge-tipo"
-          :class="isEntrata ? 'mov-badge-entrata' : 'mov-badge-uscita'"
+          :class="isUscita ? 'mov-badge-uscita' : 'mov-badge-entrata'"
         >
-          {{ movimento.tipo || (isEntrata ? 'Entrata' : 'Uscita') }}
+          {{ tipoLabel }}
         </span>
 
-        <span
-          v-if="contoLabel"
-          class="badge rounded-pill bg-light border text-muted small"
-        >
+        <span v-if="contoLabel" class="badge rounded-pill mov-badge-conto">
           {{ contoLabel }}
         </span>
       </div>
 
-      <!-- descrizione -->
-      <div class="fw-semibold text-truncate mb-1">
+      <!-- descrizione (troncata con tre puntini, cliccabile per espandere) -->
+      <div
+        class="fw-semibold mb-1 mov-desc"
+        :class="{ 'text-truncate': !showFullDesc }"
+        @click="showFullDesc = !showFullDesc"
+      >
         {{ movimento.descrizione }}
       </div>
 
       <!-- categorie + tag -->
       <div class="d-flex flex-wrap gap-1 align-items-center small">
-        <!-- categoria interna -->
+        <!-- categoria app -->
         <span
-          class="badge rounded-pill mov-badge-cat-int"
           v-if="categoriaLabel"
+          class="badge rounded-pill mov-badge-cat-app"
         >
           {{ categoriaLabel }}
         </span>
 
-        <!-- categoria banca (solo se diversa da categoria interna) -->
+        <!-- categoria banca (se diversa da app e se richiesta) -->
         <span
           v-if="
             showCategoriaBanca &&
@@ -135,71 +135,114 @@ const tagsList = computed(() => {
         </span>
 
         <!-- tag -->
-        <span
-          v-if="showTags && tagsList.length">
+        <span v-if="showTags">
           <span
             v-for="tag in tagsList"
             :key="tag"
             class="badge rounded-pill mov-badge-tag"
           >
             #{{ tag }}
-            </span>
+          </span>
         </span>
       </div>
     </div>
 
     <!-- COLONNA DESTRA: importo + azioni -->
-    <div
-      class="flex-shrink-0 text-end d-flex flex-column align-items-end gap-2"
-    >
+    <div class="mov-col-right">
       <div
-        class="fw-bold mov-importo"
-        :class="isEntrata ? 'text-success' : 'text-danger'"
+        class="mov-importo fw-bold"
+        :class="isUscita ? 'text-danger' : 'text-success'"
       >
-        {{ importoFormatted }}
+        {{ importoLabel }}
       </div>
 
-      <!-- slot per pulsanti azione (vedi MovimentiView) -->
-      <slot name="actions"></slot>
+      <div class="mov-actions">
+        <!-- slot: pulsanti (view / edit / split...) -->
+        <slot name="actions" />
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .mov-row {
-  cursor: default;
+  display: flex;
+  justify-content: space-between;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+/* colonna sinistra prende tutto lo spazio disponibile */
+.mov-col-left {
+  flex: 1 1 auto;
+  min-width: 0; /* per far funzionare text-truncate */
+}
+
+/* colonna destra (importo + pulsanti) resta compatta */
+.mov-col-right {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+/* descrizione (testo troncato) */
+.mov-desc {
+  cursor: pointer;
+  display: block;
+  max-width: 100%;
+}
+
+/* su mobile la stringa è più corta per farci stare importo + pulsanti */
+.mov-desc.text-truncate {
+  max-width: 220px;
+}
+
+@media (min-width: 768px) {
+  .mov-desc.text-truncate {
+    max-width: 420px;
+  }
 }
 
 /* data */
-.mov-date {
-  font-size: 0.75rem;
+.mov-data {
+  font-size: 0.8rem;
 }
 
-/* badge tipo Entrata/Uscita */
+/* badge tipo */
 .mov-badge-tipo {
   font-size: 0.7rem;
-  padding: 0.15rem 0.5rem;
-}
-.mov-badge-entrata {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-}
-.mov-badge-uscita {
-  background: rgba(239, 68, 68, 0.1);
-  color: #dc2626;
+  padding-inline: 0.6rem;
 }
 
-/* categoria interna */
-.mov-badge-cat-int {
+.mov-badge-entrata {
+  background: rgba(22, 163, 74, 0.12);
+  color: #15803d;
+}
+
+.mov-badge-uscita {
+  background: rgba(220, 38, 38, 0.12);
+  color: #b91c1c;
+}
+
+/* conto */
+.mov-badge-conto {
+  background: rgba(15, 23, 42, 0.04);
+  color: #0f172a;
+  font-weight: 500;
+}
+
+/* categorie */
+.mov-badge-cat-app {
   background: rgba(59, 130, 246, 0.1);
   color: #1d4ed8;
+  font-weight: 500;
 }
 
-/* categoria banca */
 .mov-badge-cat-banca {
-  background: #f8fafc;
-  border: 1px solid #e5e7eb;
-  color: #4b5563;
+  background: rgba(148, 163, 184, 0.16);
+  color: #0f172a;
 }
 
 /* tag */
@@ -212,5 +255,12 @@ const tagsList = computed(() => {
 /* importo */
 .mov-importo {
   font-size: 0.95rem;
+}
+
+/* colonna azioni: verticale, dentro la card */
+.mov-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
 }
 </style>

@@ -2,17 +2,16 @@
   <!-- Questa è l'area centrale che SCORRE -->
   <main class="scroll-area">
     <div class="container py-3">
-      
       <!-- Qui dentro verranno caricate le pagine (Dashboard, Movimenti, ecc.) -->
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
-          <component :is="Component" />
+          <!-- AGGIUNTO :key="$route.fullPath" -->
+          <component :is="Component" :key="$route.fullPath" />
         </transition>
       </router-view>
 
       <!-- Spazio extra per non finire sotto il footer mobile -->
       <div class="spacer-bottom d-lg-none"></div>
-      
     </div>
   </main>
 </template>
@@ -24,7 +23,7 @@
   overflow-y: auto; /* Abilita lo scroll */
   overflow-x: hidden;
   position: relative;
-  
+
   /* Scrollbar carina */
   scrollbar-width: thin;
 }
@@ -34,6 +33,12 @@
 }
 
 /* Animazioni cambio pagina */
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
 </style>
