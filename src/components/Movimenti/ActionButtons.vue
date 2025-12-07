@@ -1,71 +1,105 @@
 <template>
-  <!-- Container flessibile per allineare i bottoni -->
-  <div
-    class="mov-actions d-flex flex-column flex-md-row gap-2 justify-content-end w-100 w-md-auto mt-2 mt-md-0"
-  >
+  <!-- Layout orizzontale su mobile, riga sotto il contenuto -->
+  <div class="mov-actions d-flex flex-row gap-2 justify-content-center w-100 mt-2">
     <!-- Dettaglio (Occhio) -->
-    <Button
-      icon="bi-eye"
-      class="bg-white border text-primary shadow-sm"
-      title="Dettaglio"
+    <button
       @click="$emit('view')"
-    />
+      class="action-btn action-btn-view"
+      title="Dettaglio"
+    >
+      <i class="bi bi-eye"></i>
+      <span class="d-none d-md-inline ms-1">Dettaglio</span>
+    </button>
 
     <!-- Modifica (Matita) -->
-    <Button
-      icon="bi-pencil"
-      class="bg-white border text-dark shadow-sm"
-      title="Modifica"
+    <button
       @click="$emit('edit')"
-    />
+      class="action-btn action-btn-edit"
+      title="Modifica"
+    >
+      <i class="bi bi-pencil"></i>
+      <span class="d-none d-md-inline ms-1">Modifica</span>
+    </button>
 
     <!-- Dividi (Split) -->
-    <Button
-      icon="bi-scissors"
-      class="bg-white border text-warning shadow-sm"
-      title="Dividi"
+    <button
       @click="$emit('split')"
-    />
+      class="action-btn action-btn-split"
+      title="Dividi"
+    >
+      <i class="bi bi-scissors"></i>
+      <span class="d-none d-md-inline ms-1">Dividi</span>
+    </button>
   </div>
 </template>
 
 <script setup>
-// Bottone UI riutilizzabile
-import Button from "@/components/UI/Button/Button.vue";
-
 // Eventi che esponiamo al genitore (MovimentiView)
 defineEmits(["view", "edit", "split"]);
 </script>
 
 <style scoped>
-/* Contenitore: su mobile in colonna, da md in poi in riga (gestito dalle classi Bootstrap) */
 .mov-actions {
-  align-items: flex-end;
+  border-top: 1px solid #e9ecef;
+  padding-top: 12px;
 }
 
-/* Rimpiccioliamo i bottoni dentro le card movimenti */
-.mov-actions :deep(.base-btn) {
-  padding: 0.25rem 0.4rem; /* meno padding */
-  min-width: 40px;
-  height: 40px;
-  border-radius: 12px;
-
+.action-btn {
+  flex: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
+  padding: 10px 16px;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  background: white;
   font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 42px; /* Touch-friendly */
 }
 
-/* Icone leggermente più grandi per restare leggibili */
-.mov-actions :deep(.base-btn i.bi) {
+.action-btn i {
   font-size: 1.1rem;
 }
 
-/* Da tablet in su li riallineiamo al centro della card */
+/* Hover states */
+.action-btn-view {
+  color: #0d6efd;
+}
+
+.action-btn-view:hover {
+  background: #e7f1ff;
+  border-color: #0d6efd;
+}
+
+.action-btn-edit {
+  color: #6c757d;
+}
+
+.action-btn-edit:hover {
+  background: #f8f9fa;
+  border-color: #6c757d;
+}
+
+.action-btn-split {
+  color: #ffc107;
+}
+
+.action-btn-split:hover {
+  background: #fff3cd;
+  border-color: #ffc107;
+}
+
+.action-btn:active {
+  transform: scale(0.96);
+}
+
 @media (min-width: 768px) {
-  .mov-actions {
-    align-items: center;
+  .action-btn {
+    flex: 0 0 auto;
+    min-width: 100px;
   }
 }
 </style>

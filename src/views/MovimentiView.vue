@@ -31,6 +31,7 @@ const filtroDataA = ref(""); // YYYY-MM-DD
 const filtroDescrizione = ref(""); // testo libero
 const showAutocomplete = ref(false); // mostra dropdown autocomplete
 const showFiltersAdvanced = ref(false); // mostra/nascondi filtri avanzati
+const showActionMenu = ref(false); // menu burger azioni mobile
 
 // Liste per select
 const listaProfili = ref([]); // [{ id, nome }, ...]
@@ -252,12 +253,6 @@ const resettaFiltri = () => {
   filtroDescrizione.value = "";
 };
 
-// Applica filtri (chiude modale mobile)
-const applicaFiltri = () => {
-  showFiltersAdvanced.value = false;
-  // I filtri sono già reattivi, non serve ricaricare
-};
-
 // ================== MODALE DETTAGLIO ==================
 const apriDettaglio = (mov, mode = "view") => {
   if (!refDettaglio.value) return;
@@ -270,31 +265,28 @@ onMounted(caricaMovimenti);
 <template>
   <!-- Layout verticale: header fisso + lista che scorre -->
   <div class="page-fixed-layout">
-    <!-- HEADER -->
-    <header class="page-header px-4 py-3 bg-white border-bottom">
+    <!-- HEADER COMPATTO -->
+    <header class="page-header px-3 px-md-4 py-2 py-md-3 bg-white border-bottom">
       <!-- TITOLO + AZIONI PRINCIPALI -->
       <div
-        class="d-flex flex-wrap align-items-start justify-content-between gap-3"
+        class="d-flex flex-wrap align-items-center justify-content-between gap-2"
       >
         <div>
-          <h3 class="fw-bold text-dark mb-1">Movimenti</h3>
-          <p class="text-muted small mb-0">
-            Ultimi movimenti registrati (max 300). Puoi filtrare per utente e
-            conto.
+          <h3 class="fw-bold text-dark mb-0 fs-5 fs-md-4">Movimenti</h3>
+          <p class="text-muted small mb-0 d-none d-md-block">
+            Ultimi movimenti registrati (max 3000).
           </p>
         </div>
 
-        <!-- AZIONI (stanno sempre a destra / sotto su mobile) -->
-        <div class="d-flex flex-wrap gap-2">
-          <!-- Vai alla pagina Importa -->
+        <!-- AZIONI -->
+        <!-- Desktop: Bottoni normali -->
+        <div class="d-none d-md-flex gap-2">
           <button
             class="btn btn-outline-primary fw-bold mov-action-btn shadow-sm"
             @click="router.push('/importa')"
           >
             <i class="bi bi-upload me-1" /> Importa estratto
           </button>
-
-          <!-- Apre il modale Nuovo (id #modalNuovo gestito in App.vue) -->
           <button
             class="btn btn-primary fw-bold mov-action-btn shadow-sm"
             data-bs-toggle="modal"
@@ -302,6 +294,42 @@ onMounted(caricaMovimenti);
           >
             <i class="bi bi-plus-lg me-1" /> Nuovo
           </button>
+        </div>
+
+        <!-- Mobile: Menu burger -->
+        <div class="d-md-none position-relative">
+          <button 
+            @click="showActionMenu = !showActionMenu"
+            class="btn btn-outline-primary btn-sm px-2"
+            type="button"
+          >
+            <i class="bi bi-three-dots-vertical fs-5"></i>
+          </button>
+          
+          <!-- Dropdown menu -->
+          <div 
+            v-show="showActionMenu" 
+            class="dropdown-menu-mobile"
+            @click="showActionMenu = false"
+          >
+            <button 
+              @click="router.push('/importa')"
+              class="dropdown-item-mobile"
+              type="button"
+            >
+              <i class="bi bi-upload me-2"></i>
+              Importa estratto
+            </button>
+            <button 
+              data-bs-toggle="modal"
+              data-bs-target="#modalNuovo"
+              class="dropdown-item-mobile"
+              type="button"
+            >
+              <i class="bi bi-plus-lg me-2"></i>
+              Nuovo movimento
+            </button>
+          </div>
         </div>
       </div>
 
@@ -447,93 +475,102 @@ onMounted(caricaMovimenti);
         </div>
       </div>
 
-      <!-- MODALE FILTRI MOBILE (Full Screen) -->
-      <div v-if="showFiltersAdvanced" class="mobile-filters-modal d-md-none">
-        <div class="modal-content-mobile">
-          <div class="modal-header-mobile">
-            <h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtri Ricerca</h5>
-            <button @click="showFiltersAdvanced = false" class="btn-close-mobile">
-              <i class="bi bi-x-lg"></i>
-            </button>
-          </div>
-
-          <div class="modal-body-mobile">
-            <!-- CONTO -->
-            <div class="mb-3">
-              <label class="small text-muted mb-1 d-block fw-bold">Conto</label>
-              <select v-model="filtroConto" class="form-select">
-                <option value="all">Tutti</option>
-                <option v-for="c in contiOptions" :key="c" :value="c">{{ c }}</option>
-              </select>
-            </div>
-
-            <!-- CATEGORIA -->
-            <div class="mb-3">
-              <label class="small text-muted mb-1 d-block fw-bold">Categoria</label>
-              <select v-model="filtroCategoria" class="form-select">
-                <option value="">Tutte</option>
-                <option v-for="cat in listaCategorie" :key="cat.nome" :value="cat.nome">
-                  {{ cat.nome }}
-                </option>
-              </select>
-            </div>
-
-            <!-- TAGS -->
-            <div class="mb-3">
-              <label class="small text-muted mb-1 d-block fw-bold">Tags</label>
-              <select @change="aggiungiTag" class="form-select">
-                <option value="">+ Aggiungi tag</option>
-                <option v-for="tag in listaTags" :key="tag.nome" :value="tag.nome" :disabled="filtroTags.includes(tag.nome)">
-                  {{ tag.nome }}
-                </option>
-              </select>
-              <div v-if="filtroTags.length > 0" class="mt-2">
-                <span v-for="tag in filtroTags" :key="tag" class="selected-tag-badge-small me-1">
-                  #{{ tag }}
-                  <i @click="rimuoviTag(tag)" class="bi bi-x-circle-fill ms-1"></i>
-                </span>
-              </div>
-            </div>
-
-            <!-- DATE -->
-            <div class="mb-3">
-              <label class="small text-muted mb-1 d-block fw-bold">Data da</label>
-              <input v-model="filtroDataDa" @change="onDataDaChange" type="date" class="form-control" />
-            </div>
-
-            <div class="mb-3">
-              <label class="small text-muted mb-1 d-block fw-bold">Data a</label>
-              <input v-model="filtroDataA" :min="filtroDataDa" type="date" class="form-control" />
-            </div>
-
-            <!-- DESCRIZIONE -->
-            <div class="mb-3">
-              <label class="small text-muted mb-1 d-block fw-bold">Descrizione</label>
-              <input
-                v-model="filtroDescrizione"
-                type="text"
-                class="form-control"
-                placeholder="Cerca nella descrizione..."
-              />
-            </div>
-          </div>
-
-          <div class="modal-footer-mobile">
-            <button @click="resettaFiltri" class="btn btn-outline-secondary flex-fill">
-              <i class="bi bi-arrow-counterclockwise me-1"></i>
-              Reset
-            </button>
-            <button @click="applicaFiltri" class="btn btn-primary flex-fill">
-              <i class="bi bi-check-lg me-1"></i>
-              Applica
-            </button>
-          </div>
-        </div>
-      </div>
     </header>
 
+    <!-- MODALE FILTRI MOBILE (Full Screen) - FUORI DALL'HEADER -->
+    <div 
+      v-show="showFiltersAdvanced" 
+      class="mobile-filters-modal d-md-none"
+      @click.self="showFiltersAdvanced = false"
+    >
+      <div class="modal-content-mobile">
+        <div class="modal-header-mobile">
+          <h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtri Ricerca</h5>
+          <button 
+            @click.stop="showFiltersAdvanced = false" 
+            class="btn-close-mobile"
+            type="button"
+          >
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        <div class="modal-body-mobile">
+          <!-- CONTO -->
+          <div class="mb-3">
+            <label class="small text-muted mb-1 d-block fw-bold">Conto</label>
+            <select v-model="filtroConto" class="form-select">
+              <option value="all">Tutti</option>
+              <option v-for="c in contiOptions" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
+
+          <!-- CATEGORIA -->
+          <div class="mb-3">
+            <label class="small text-muted mb-1 d-block fw-bold">Categoria</label>
+            <select v-model="filtroCategoria" class="form-select">
+              <option value="">Tutte</option>
+              <option v-for="cat in listaCategorie" :key="cat.nome" :value="cat.nome">
+                {{ cat.nome }}
+              </option>
+            </select>
+          </div>
+
+          <!-- TAGS -->
+          <div class="mb-3">
+            <label class="small text-muted mb-1 d-block fw-bold">Tags</label>
+            <select @change="aggiungiTag" class="form-select">
+              <option value="">+ Aggiungi tag</option>
+              <option v-for="tag in listaTags" :key="tag.nome" :value="tag.nome" :disabled="filtroTags.includes(tag.nome)">
+                {{ tag.nome }}
+              </option>
+            </select>
+            <div v-if="filtroTags.length > 0" class="mt-2">
+              <span v-for="tag in filtroTags" :key="tag" class="selected-tag-badge-small me-1">
+                #{{ tag }}
+                <i @click="rimuoviTag(tag)" class="bi bi-x-circle-fill ms-1"></i>
+              </span>
+            </div>
+          </div>
+
+          <!-- DATE -->
+          <div class="mb-3">
+            <label class="small text-muted mb-1 d-block fw-bold">Data da</label>
+            <input v-model="filtroDataDa" @change="onDataDaChange" type="date" class="form-control" />
+          </div>
+
+          <div class="mb-3">
+            <label class="small text-muted mb-1 d-block fw-bold">Data a</label>
+            <input v-model="filtroDataA" :min="filtroDataDa" type="date" class="form-control" />
+          </div>
+
+          <!-- DESCRIZIONE -->
+          <div class="mb-3">
+            <label class="small text-muted mb-1 d-block fw-bold">Descrizione</label>
+            <input
+              v-model="filtroDescrizione"
+              type="text"
+              class="form-control"
+              placeholder="Cerca nella descrizione..."
+            />
+          </div>
+        </div>
+
+        <div class="modal-footer-mobile">
+          <button @click="resettaFiltri(); showFiltersAdvanced = false" class="btn btn-outline-secondary flex-fill">
+            <i class="bi bi-arrow-counterclockwise me-1"></i>
+            Reset
+          </button>
+          <button @click="showFiltersAdvanced = false" class="btn btn-primary flex-fill">
+            <i class="bi bi-check-lg me-1"></i>
+            Applica
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- CONTENUTO SCORREVOLE -->
-    <div class="page-content-scroll px-3 px-md-4 py-3">
+    <div class="page-content-scroll px-3 px-md-4 pt-3 pb-1">
       <!-- Errori -->
       <div v-if="errore" class="alert alert-danger">
         {{ errore }}
@@ -562,11 +599,11 @@ onMounted(caricaMovimenti);
       </div>
 
       <!-- LISTA MOVIMENTI -->
-      <div v-else class="d-flex flex-column gap-2">
+      <div v-else class="movimenti-list">
         <div
           v-for="mov in movimentiFiltrati"
           :key="mov.id"
-          class="card border-0 shadow-sm"
+          class="card border-0 shadow-sm movimento-card"
         >
           <div class="card-body p-2 p-md-3">
             <MovimentoInfo
@@ -586,9 +623,6 @@ onMounted(caricaMovimenti);
           </div>
         </div>
       </div>
-
-      <!-- Spazio in fondo -->
-      <div style="height: 40px"></div>
     </div>
 
     <!-- Modale dettaglio (modifica / split ecc.) -->
@@ -619,19 +653,84 @@ onMounted(caricaMovimenti);
   scrollbar-width: thin;
   scrollbar-color: #cbd5e1 transparent;
 }
+
 .page-content-scroll::-webkit-scrollbar {
   width: 6px;
 }
+
 .page-content-scroll::-webkit-scrollbar-thumb {
   background-color: #cbd5e1;
   border-radius: 10px;
 }
 
-/* Box filtri - Compatto */
+/* Lista movimenti - no gap extra */
+.movimenti-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.movimenti-list .movimento-card {
+  margin-bottom: 8px;
+}
+
+.movimenti-list .movimento-card:last-child {
+  margin-bottom: 0; /* Ultimo elemento senza margin */
+}
+
+/* Header compatto mobile */
+.page-header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+/* Dropdown menu mobile (burger) */
+.dropdown-menu-mobile {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background: white;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 200px;
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.dropdown-item-mobile {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  border: none;
+  background: white;
+  text-align: left;
+  font-size: 0.95rem;
+  color: #212529;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  border-bottom: 1px solid #f1f3f5;
+}
+
+.dropdown-item-mobile:last-child {
+  border-bottom: none;
+}
+
+.dropdown-item-mobile:hover {
+  background: #f8f9fa;
+}
+
+.dropdown-item-mobile:active {
+  background: #e9ecef;
+}
+
+/* Box filtri - Più compatto su mobile */
 .mov-filters {
   background: #f8f9fa;
   border-radius: 8px;
-  padding: 12px;
+  padding: 8px;
   border: 1px solid #dee2e6;
 }
 
@@ -709,7 +808,7 @@ onMounted(caricaMovimenti);
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  z-index: 1050;
+  z-index: 9999; /* MOLTO ALTO - sopra a tutto */
   display: flex;
   animation: fadeIn 0.2s ease;
 }
@@ -786,15 +885,47 @@ onMounted(caricaMovimenti);
   min-width: 140px;
 }
 
+/* Card movimento mobile */
+.movimento-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.movimento-card:active {
+  transform: scale(0.98);
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .mov-filters {
-    padding: 10px;
+    padding: 6px;
   }
 
   .mov-action-btn {
     width: 100%;
     justify-content: center;
+  }
+
+  /* Card movimenti più compatte su mobile */
+  .movimento-card {
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  .movimento-card .card-body {
+    padding: 12px !important;
+  }
+
+  /* Testo ottimizzato per mobile */
+  .movimento-card {
+    font-size: 0.9rem;
+  }
+
+  .movimento-card .fw-bold {
+    font-size: 1rem !important;
+  }
+
+  .movimento-card .small {
+    font-size: 0.8rem !important;
   }
 }
 </style>

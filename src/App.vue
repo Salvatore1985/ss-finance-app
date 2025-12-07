@@ -100,7 +100,7 @@ body {
   overflow-y: auto; /* Scrolla qui dentro */
   overflow-x: hidden;
   position: relative;
-  padding-bottom: 100px; /* Spazio extra per footer mobile */
+  padding-bottom: 0; /* Rimosso - ogni view gestisce il proprio spacing */
 }
 
 /* Stile speciale per Login: centra tutto */
