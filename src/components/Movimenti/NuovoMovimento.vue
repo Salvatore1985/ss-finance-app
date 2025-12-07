@@ -109,7 +109,7 @@
 
             <div class="mb-4">
               <label class="form-label small fw-bold text-muted text-uppercase ls-1">Allegato</label>
-              <input type="file" accept="image/*" @change="handleFile" class="form-control form-control-sm text-muted">
+              <input type="file" accept="image/*,application/pdf" @change="handleFile" class="form-control form-control-sm text-muted">
             </div>
 
             <!-- 6. Submit -->
