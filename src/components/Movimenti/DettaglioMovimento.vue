@@ -86,7 +86,9 @@ const apri = (mov, modalitaIniziale = "view") => {
   splitForm.value = { amount: "", category: "" };
 
   const el = document.getElementById("modalDettaglio");
-  const modal = new Modal(el);
+  // IMPORTANTE: Usa getOrCreateInstance invece di new Modal
+  // Questo previene la creazione di istanze multiple e backdrop duplicati
+  const modal = Modal.getOrCreateInstance(el);
   modal.show();
 };
 
@@ -185,11 +187,22 @@ const eseguiSplit = async () => {
 const chiudiEaggiorna = () => {
   const el = document.getElementById("modalDettaglio");
   const modal = Modal.getInstance(el);
-  modal.hide();
-  const bd = document.querySelector(".modal-backdrop");
-  if (bd) bd.remove();
-  document.body.classList.remove("modal-open");
-  document.body.style = "";
+  if (modal) {
+    modal.hide();
+  }
+  
+  // Reset mode to view for next opening
+  mode.value = "view";
+  
+  // Cleanup backdrop and body classes (precauzione aggiuntiva)
+  setTimeout(() => {
+    const backdrops = document.querySelectorAll(".modal-backdrop");
+    backdrops.forEach(bd => bd.remove());
+    document.body.classList.remove("modal-open");
+    document.body.style.removeProperty("overflow");
+    document.body.style.removeProperty("padding-right");
+  }, 300); // Aspetta che l'animazione di chiusura finisca
+  
   emit("refresh");
 };
 </script>
