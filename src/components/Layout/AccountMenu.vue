@@ -34,7 +34,9 @@ const loadProfile = async () => {
       data: { user },
       error,
     } = await supabase.auth.getUser();
+    // If auth error, gracefully reset without crashing
     if (error || !user) {
+      console.warn("Failed to load user:", error?.message);
       resetProfile();
       return;
     }
@@ -84,13 +86,20 @@ onMounted(() => {
   loadProfile();
 
   const { data } = supabase.auth.onAuthStateChange(async (event) => {
-    if (event === "SIGNED_OUT") {
-      resetProfile();
-      return;
-    }
+    try {
+      if (event === "SIGNED_OUT") {
+        resetProfile();
+        return;
+      }
 
-    // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED → aggiorno l'avatar
-    await loadProfile();
+      // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED → aggiorno l'avatar
+      await loadProfile();
+    } catch (error) {
+      console.error("Errore in onAuthStateChange:", error);
+      // In caso di errore, resetta il profilo per evitare loop infiniti
+      resetProfile();
+      loadingProfile.value = false;
+    }
   });
 
   authSubscription = data?.subscription;

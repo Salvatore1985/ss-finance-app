@@ -59,10 +59,17 @@ const router = createRouter({
 // Questo codice viene eseguito PRIMA di ogni cambio pagina
 router.beforeEach(async (to, from, next) => {
   try {
-    // 1. Chiediamo a Supabase: "C'è una sessione attiva?"
-    const { data } = await supabase.auth.getSession();
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    // If session retrieval fails, clear corrupted data and redirect to login
+    if (sessionError) {
+      console.error("Session retrieval error:", sessionError);
+      await supabase.auth.signOut(); // This clears localStorage
+      if (to.name !== "login") {
+        return next({ name: "login" });
+      }
+      return next();
+    }
     const session = data?.session;
-
     // 2. Se la pagina richiede login (requiresAuth) e NON c'è sessione -> LOGIN
     if (to.meta.requiresAuth && !session) {
       return next({ name: "login" });
@@ -77,8 +84,13 @@ router.beforeEach(async (to, from, next) => {
     next();
   } catch (error) {
     console.error("Errore router:", error);
-    // In caso di errore grave, manda al login per sicurezza
-    next({ name: "login" });
+    // Clear potentially corrupted session
+    await supabase.auth.signOut();
+    if (to.name !== "login") {
+      next({ name: "login" });
+    } else {
+      next();
+    }
   }
 });
 
