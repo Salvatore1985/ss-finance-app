@@ -14,7 +14,7 @@ const listaCategorie = ref([]);
 const listaTag = ref([]);
 
 const editForm = ref({ tags: [] });
-const splitForm = ref({ amount: "", category: "" });
+const splitForm = ref({ amount: "", category: "", tags: [] });
 
 // --- LABEL CATEGORIA (interna o banca) ---
 const categoriaLabel = computed(() => {
@@ -70,9 +70,9 @@ onMounted(async () => {
 
 const splitRimanente = computed(() => {
   if (!movimento.value) return 0;
-  const tot = parseFloat(movimento.value.importo);
-  const part = parseFloat(splitForm.value.amount) || 0;
-  return (tot - part).toFixed(2);
+  const totaleAbs = Math.abs(parseFloat(movimento.value.importo));
+  const partAbs = Math.abs(parseFloat(splitForm.value.amount) || 0);
+  return (totaleAbs - partAbs).toFixed(2);
 });
 
 const apri = (mov, modalitaIniziale = "view") => {
@@ -83,7 +83,7 @@ const apri = (mov, modalitaIniziale = "view") => {
     ...mov,
     tags: normalizeTags(mov.tags),
   };
-  splitForm.value = { amount: "", category: "" };
+  splitForm.value = { amount: "", category: "", tags: [] }; // Reset tags nello split
 
   const el = document.getElementById("modalDettaglio");
   // IMPORTANTE: Usa getOrCreateInstance invece di new Modal
@@ -102,6 +102,16 @@ const aggiungiTag = (event) => {
   event.target.value = "";
 };
 const rimuoviTag = (idx) => editForm.value.tags.splice(idx, 1);
+
+// Gestione tag per lo split
+const aggiungiTagSplit = (event) => {
+  const val = event.target.value;
+  if (val && !splitForm.value.tags.includes(val)) {
+    splitForm.value.tags.push(val);
+  }
+  event.target.value = "";
+};
+const rimuoviTagSplit = (idx) => splitForm.value.tags.splice(idx, 1);
 
 const salvaModifica = async () => {
   try {
@@ -141,21 +151,20 @@ const elimina = async () => {
   }
 };
 
-const eseguiSplit = async () => {
+// Conferma prima di eseguire lo split
+const confermaeSplit = () => {
   const imp = parseFloat(splitForm.value.amount);
   const totale = parseFloat(movimento.value.importo);
+  const totaleAbs = Math.abs(totale);
+  const impAbs = Math.abs(imp);
   
   // Validazione input
   if (!imp || !splitForm.value.category) {
-    alert("Compila tutti i campi (importo e categoria)");
+    alert("Compila tutti i campi obbligatori (importo e categoria)");
     return;
   }
   
-  // IMPORTANTE: Le uscite sono negative, quindi usiamo valori assoluti per il confronto
-  const impAbs = Math.abs(imp);
-  const totaleAbs = Math.abs(totale);
-  const EPSILON = 0.01; // tolleranza di 1 centesimo
-  
+  const EPSILON = 0.01;
   if (impAbs > totaleAbs + EPSILON) {
     alert(`Importo troppo alto! Massimo: €${totaleAbs.toFixed(2)}`);
     return;
@@ -166,6 +175,18 @@ const eseguiSplit = async () => {
     return;
   }
 
+  // Apri il modale di conferma Bootstrap
+  const el = document.getElementById("modalConfermaSplit");
+  const modal = Modal.getOrCreateInstance(el);
+  modal.show();
+};
+
+const eseguiSplit = async () => {
+  // Le validazioni sono già state fatte in confermaeSplit
+  const imp = parseFloat(splitForm.value.amount);
+  const totale = parseFloat(movimento.value.importo);
+  const impAbs = Math.abs(imp);
+
   try {
     loading.value = true;
     const {
@@ -173,9 +194,6 @@ const eseguiSplit = async () => {
     } = await supabase.auth.getUser();
     
     // Per le uscite (negative), dobbiamo mantenere il segno
-    // Se totale è -28.21 e split 10, allora:
-    // - la parte split sarà -10 (se uscita)
-    // - il rimanente sarà -18.21
     const impConSegno = totale < 0 ? -impAbs : impAbs;
     const rimasto = totale - impConSegno;
 
@@ -188,7 +206,7 @@ const eseguiSplit = async () => {
       })
       .eq("id", movimento.value.id);
 
-    // Insert nuovo
+    // Insert nuovo con i tag
     await supabase.from("transazioni").insert([
       {
         user_id: user.id,
@@ -198,9 +216,17 @@ const eseguiSplit = async () => {
         tipo: movimento.value.tipo,
         categoria: splitForm.value.category,
         conto: movimento.value.conto,
+        tags: splitForm.value.tags, // Includi i tag
         stato: "confermato",
       },
     ]);
+
+    // Chiudi il modale di conferma
+    const modalConferma = document.getElementById("modalConfermaSplit");
+    const instanceConferma = Modal.getInstance(modalConferma);
+    if (instanceConferma) {
+      instanceConferma.hide();
+    }
 
     chiudiEaggiorna();
   } catch (e) {
@@ -435,7 +461,7 @@ const chiudiEaggiorna = () => {
                 Rimanente: <b>{{ splitRimanente }} €</b>
               </div>
             </div>
-            <div class="mb-4">
+            <div class="mb-3">
               <label class="small text-muted">Nuova Categoria</label>
               <select v-model="splitForm.category" class="form-select">
                 <option
@@ -447,6 +473,37 @@ const chiudiEaggiorna = () => {
                 </option>
               </select>
             </div>
+            
+            <!-- TAG DINAMICI per lo split -->
+            <div class="mb-4 border rounded-3 p-2 bg-light">
+              <label class="small text-muted mb-2 d-block">Tag (opzionali)</label>
+              <div
+                class="d-flex flex-wrap gap-2 mb-2"
+                v-if="splitForm.tags && splitForm.tags.length > 0"
+              >
+                <span
+                  v-for="(t, idx) in splitForm.tags"
+                  :key="idx"
+                  class="badge bg-warning text-dark border border-warning rounded-pill px-3 d-flex align-items-center"
+                >
+                  #{{ t }}
+                  <i
+                    class="bi bi-x-circle-fill ms-2 cursor-pointer opacity-50"
+                    @click="rimuoviTagSplit(idx)"
+                  ></i>
+                </span>
+              </div>
+              <select
+                class="form-select form-select-sm border-0 bg-transparent"
+                @change="aggiungiTagSplit"
+              >
+                <option value="" selected>+ Tag</option>
+                <option v-for="t in listaTag" :key="t.nome" :value="t.nome">
+                  {{ t.nome }}
+                </option>
+              </select>
+            </div>
+            
             <div class="d-flex gap-2">
               <button
                 @click="mode = 'view'"
@@ -455,13 +512,69 @@ const chiudiEaggiorna = () => {
                 Annulla
               </button>
               <button
-                @click="eseguiSplit"
+                @click="confermaeSplit"
                 class="btn btn-warning w-100 fw-bold"
               >
                 Conferma
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODALE CONFERMA SPLIT -->
+  <div
+    class="modal fade"
+    id="modalConfermaSplit"
+    tabindex="-1"
+    aria-hidden="true"
+    data-bs-backdrop="static"
+  >
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+      <div class="modal-content border-0 shadow-lg" style="border-radius: 16px">
+        <div class="modal-header border-0 bg-warning text-dark p-3">
+          <h6 class="modal-title fw-bold mb-0">
+            <i class="bi bi-scissors me-2"></i>Conferma Split
+          </h6>
+          <button
+            type="button"
+            class="btn-close"
+            data-bs-dismiss="modal"
+            aria-label="Close"
+          ></button>
+        </div>
+        <div class="modal-body p-4">
+          <p class="mb-2"><strong>Importo da dividere:</strong> €{{ Math.abs(parseFloat(splitForm.amount || 0)).toFixed(2) }}</p>
+          <p class="mb-2"><strong>Categoria:</strong> {{ splitForm.category }}</p>
+          <p class="mb-3">
+            <strong>Tags:</strong> 
+            <span v-if="splitForm.tags && splitForm.tags.length > 0">
+              {{ splitForm.tags.join(', ') }}
+            </span>
+            <span v-else class="text-muted">Nessuno</span>
+          </p>
+          <hr class="my-3" />
+          <p class="mb-0 text-muted small">
+            <strong>Rimanente:</strong> €{{ splitRimanente }}
+          </p>
+        </div>
+        <div class="modal-footer border-0 p-3 gap-2">
+          <button
+            type="button"
+            class="btn btn-light fw-bold flex-fill"
+            data-bs-dismiss="modal"
+          >
+            Annulla
+          </button>
+          <button
+            type="button"
+            class="btn btn-warning fw-bold flex-fill"
+            @click="eseguiSplit"
+          >
+            Ok
+          </button>
         </div>
       </div>
     </div>
