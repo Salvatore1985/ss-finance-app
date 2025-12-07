@@ -82,18 +82,40 @@ const logout = async () => {
   router.push({ name: "login" });
 };
 
-onMounted(() => {
-  loadProfile();
+onMounted(async () => {
+  // CRITICO: Non chiamare loadProfile se non c'è una sessione valida
+  // Questo previene lo spinner infinito quando l'utente non è loggato
+  try {
+    const { data } = await supabase.auth.getSession();
+    if (data?.session) {
+      // C'è una sessione valida, carica il profilo
+      loadProfile();
+    } else {
+      // Nessuna sessione, assicurati che il loading sia false
+      loadingProfile.value = false;
+    }
+  } catch (error) {
+    console.error("Errore verifica sessione iniziale:", error);
+    loadingProfile.value = false;
+  }
 
   const { data } = supabase.auth.onAuthStateChange(async (event) => {
     try {
+      // Reset profilo quando l'utente si disconnette
       if (event === "SIGNED_OUT") {
         resetProfile();
+        loadingProfile.value = false; // Assicurati che lo spinner si fermi
         return;
       }
 
-      // SIGNED_IN / TOKEN_REFRESHED / USER_UPDATED → aggiorno l'avatar
-      await loadProfile();
+      // Carica il profilo SOLO quando c'è effettivamente una sessione valida
+      // Non chiamare loadProfile per eventi come INITIAL_SESSION quando non c'è sessione
+      if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "USER_UPDATED") {
+        await loadProfile();
+      } else {
+        // Per altri eventi (es. INITIAL_SESSION senza sessione), assicurati che non stia caricando
+        loadingProfile.value = false;
+      }
     } catch (error) {
       console.error("Errore in onAuthStateChange:", error);
       // In caso di errore, resetta il profilo per evitare loop infiniti
