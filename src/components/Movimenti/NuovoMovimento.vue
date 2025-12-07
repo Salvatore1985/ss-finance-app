@@ -104,11 +104,12 @@
               label="Note" 
               v-model="form.note" 
               placeholder="Dettagli aggiuntivi..." 
+              class="mb-3"
             />
 
             <div class="mb-4">
               <label class="form-label small fw-bold text-muted text-uppercase ls-1">Allegato</label>
-              <input type="file" @change="handleFile" class="form-control form-control-sm text-muted">
+              <input type="file" accept="image/*" @change="handleFile" class="form-control form-control-sm text-muted">
             </div>
 
             <!-- 6. Submit -->
@@ -130,7 +131,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { supabase } from '@/supabase' // Assicurati che il percorso sia giusto (usa @ per src)
+import { supabase } from '@/supabase'
 import { Modal } from 'bootstrap'
 
 // IMPORTIAMO I NUOVI COMPONENTI UI
@@ -140,7 +141,7 @@ import Button from '@/components/UI/Button/Button.vue'
 
 const emit = defineEmits(['saved'])
 const salvataggio = ref(false)
-const modalRef = ref(null) // Riferimento al DOM del modal
+const modalRef = ref(null)
 
 // Dati liste
 const listaConti = ref([])
@@ -161,7 +162,6 @@ const form = ref({
 
 // --- CARICAMENTO DATI ---
 onMounted(async () => {
-  // Caricamento parallelo (più veloce)
   const [resConti, resCat, resTag] = await Promise.all([
     supabase.from('conti').select('nome').order('nome'),
     supabase.from('categorie').select('nome').order('nome'),
@@ -181,7 +181,7 @@ onMounted(async () => {
 const aggiungiTag = (event) => {
   const tagName = event.target.value
   if (tagName && !form.value.tags.includes(tagName)) form.value.tags.push(tagName)
-  event.target.value = "" // Reset select
+  event.target.value = ""
 }
 const rimuoviTag = (index) => form.value.tags.splice(index, 1)
 
@@ -250,7 +250,6 @@ const resetForm = () => {
   form.value.tags = []
   form.value.note = ''
   form.value.file = null
-  // Non resettiamo Conto/Categoria per comodità utente
 }
 </script>
 
