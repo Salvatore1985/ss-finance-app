@@ -143,15 +143,41 @@ const elimina = async () => {
 
 const eseguiSplit = async () => {
   const imp = parseFloat(splitForm.value.amount);
-  if (!imp || !splitForm.value.category) return alert("Compila");
-  if (imp >= movimento.value.importo) return alert("Importo troppo alto");
+  const totale = parseFloat(movimento.value.importo);
+  
+  // Validazione input
+  if (!imp || !splitForm.value.category) {
+    alert("Compila tutti i campi (importo e categoria)");
+    return;
+  }
+  
+  // IMPORTANTE: Le uscite sono negative, quindi usiamo valori assoluti per il confronto
+  const impAbs = Math.abs(imp);
+  const totaleAbs = Math.abs(totale);
+  const EPSILON = 0.01; // tolleranza di 1 centesimo
+  
+  if (impAbs > totaleAbs + EPSILON) {
+    alert(`Importo troppo alto! Massimo: €${totaleAbs.toFixed(2)}`);
+    return;
+  }
+  
+  if (impAbs < EPSILON) {
+    alert("L'importo deve essere maggiore di zero");
+    return;
+  }
 
   try {
     loading.value = true;
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    const rimasto = movimento.value.importo - imp;
+    
+    // Per le uscite (negative), dobbiamo mantenere il segno
+    // Se totale è -28.21 e split 10, allora:
+    // - la parte split sarà -10 (se uscita)
+    // - il rimanente sarà -18.21
+    const impConSegno = totale < 0 ? -impAbs : impAbs;
+    const rimasto = totale - impConSegno;
 
     // Update vecchio
     await supabase
@@ -168,7 +194,7 @@ const eseguiSplit = async () => {
         user_id: user.id,
         data: movimento.value.data,
         descrizione: movimento.value.descrizione + " (Split)",
-        importo: imp,
+        importo: impConSegno,
         tipo: movimento.value.tipo,
         categoria: splitForm.value.category,
         conto: movimento.value.conto,
@@ -178,7 +204,7 @@ const eseguiSplit = async () => {
 
     chiudiEaggiorna();
   } catch (e) {
-    alert(e.message);
+    alert("Errore durante lo split: " + e.message);
   } finally {
     loading.value = false;
   }

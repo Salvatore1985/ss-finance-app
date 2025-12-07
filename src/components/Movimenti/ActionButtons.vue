@@ -21,8 +21,8 @@
 
     <!-- Dividi (Split) -->
     <Button
-      icon="bi-layout-split"
-      class="bg-white border text-dark shadow-sm"
+      icon="bi-scissors"
+      class="bg-white border text-warning shadow-sm"
       title="Dividi"
       @click="$emit('split')"
     />
