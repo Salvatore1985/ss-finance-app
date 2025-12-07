@@ -6,6 +6,7 @@ import { supabase } from "../supabase";
 import MovimentoInfo from "../components/Movimenti/MovimentoInfo.vue";
 import ActionButtons from "../components/Movimenti/ActionButtons.vue";
 import DettaglioMovimento from "../components/Movimenti/DettaglioMovimento.vue";
+import Button from "../components/UI/Button/Button.vue"; // Import Button component
 
 // (lasciati per futuro export, anche se qui non li usiamo ancora)
 import * as XLSX from "xlsx";
@@ -18,12 +19,24 @@ const loading = ref(false);
 const errore = ref("");
 const movimenti = ref([]);
 
-// Filtri
+// Filtri base
 const filtroUtente = ref("all"); // 'all' | user_id
 const filtroConto = ref("all"); // 'all' | nome conto
 
-// Profili per tradurre user_id -> nome
+// Filtri avanzati
+const filtroCategoria = ref(""); // singola categoria (non array)
+const filtroTags = ref([]); // array di nomi tags (multiselect)
+const filtroDataDa = ref(""); // YYYY-MM-DD
+const filtroDataA = ref(""); // YYYY-MM-DD
+const filtroDescrizione = ref(""); // testo libero
+const showAutocomplete = ref(false); // mostra dropdown autocomplete
+const showFiltersAdvanced = ref(false); // mostra/nascondi filtri avanzati
+
+// Liste per select
 const listaProfili = ref([]); // [{ id, nome }, ...]
+const listaCategorie = ref([]); // [{ nome }, ...]
+const listaTags = ref([]); // [{ nome }, ...]
+
 const refDettaglio = ref(null);
 
 // ================== CARICAMENTO MOVIMENTI ==================
@@ -60,6 +73,24 @@ const caricaMovimenti = async () => {
       listaProfili.value = profili;
     }
 
+    // Carica categorie per filtro
+    const { data: categorie } = await supabase
+      .from("categorie")
+      .select("nome")
+      .order("nome");
+    if (categorie) {
+      listaCategorie.value = categorie;
+    }
+
+    // Carica tags per filtro
+    const { data: tags } = await supabase
+      .from("tags")
+      .select("nome")
+      .order("nome");
+    if (tags) {
+      listaTags.value = tags;
+    }
+
     // TUTTI i movimenti (non filtrati per user_id)
     const { data, error } = await supabase
       .from("transazioni")
@@ -68,7 +99,7 @@ const caricaMovimenti = async () => {
       )
       .order("data", { ascending: false })
       .order("id", { ascending: false })
-      .limit(300);
+      .limit(3000); // Aumentato a 3000 per vedere tutti i movimenti
 
     if (error) {
       console.error(error);
@@ -97,21 +128,135 @@ const contiOptions = computed(() => {
   return Array.from(set).sort();
 });
 
-// Lista movimenti filtrata per utente + conto
+// Suggerimenti autocomplete per descrizione (unici)
+const descrizioniSuggerite = computed(() => {
+  if (!filtroDescrizione.value || filtroDescrizione.value.length < 2) {
+    return [];
+  }
+  
+  const search = filtroDescrizione.value.toLowerCase();
+  const set = new Set();
+  
+  movimenti.value.forEach((m) => {
+    const desc = (m.descrizione || "").toLowerCase();
+    // Cerca anche parzialmente, non solo all'inizio
+    if (desc.includes(search) && desc !== search) {
+      set.add(m.descrizione);
+    }
+  });
+  
+  return Array.from(set).slice(0, 10); // max 10 suggerimenti
+});
+
+// Lista movimenti filtrata
 const movimentiFiltrati = computed(() => {
   return movimenti.value.filter((m) => {
+    // Filtro utente
     if (filtroUtente.value !== "all") {
       if (m.user_id !== filtroUtente.value) return false;
     }
 
+    // Filtro conto
     if (filtroConto.value !== "all") {
       const conto = (m.conto || "").trim();
       if (conto !== filtroConto.value) return false;
     }
 
+    // Filtro categoria (singola selezione)
+    if (filtroCategoria.value) {
+      const catMovimento = m.categoria || m.categoria_banca || "";
+      if (catMovimento !== filtroCategoria.value) return false;
+    }
+
+    // Filtro tags (multiselect - almeno un tag deve corrispondere)
+    if (filtroTags.value.length > 0) {
+      const tagMovimento = Array.isArray(m.tags) ? m.tags : [];
+      const hasMatch = filtroTags.value.some(tag => tagMovimento.includes(tag));
+      if (!hasMatch) return false;
+    }
+
+    // Filtro data da
+    if (filtroDataDa.value) {
+      if (m.data < filtroDataDa.value) return false;
+    }
+
+    // Filtro data a
+    if (filtroDataA.value) {
+      if (m.data > filtroDataA.value) return false;
+    }
+
+    // Filtro descrizione (parziale, case-insensitive)
+    if (filtroDescrizione.value) {
+      const search = filtroDescrizione.value.toLowerCase();
+      const desc = (m.descrizione || "").toLowerCase();
+      if (!desc.includes(search)) return false;
+    }
+
     return true;
   });
 });
+
+// ================== HELPER FUNCTIONS ==================
+// Seleziona suggerimento autocomplete
+const selezionaSuggerimento = (descrizione) => {
+  filtroDescrizione.value = descrizione;
+  showAutocomplete.value = false;
+};
+
+// Gestione focus input descrizione
+const onDescrizioneFocus = () => {
+  if (descrizioniSuggerite.value.length > 0) {
+    showAutocomplete.value = true;
+  }
+};
+
+const onDescrizioneBlur = () => {
+  // Delay per permettere il click sul suggerimento
+  setTimeout(() => {
+    showAutocomplete.value = false;
+  }, 200);
+};
+
+// Validazione date
+const onDataDaChange = () => {
+  // Se dataA è già impostata e è prima di dataDa, resettala
+  if (filtroDataA.value && filtroDataA.value < filtroDataDa.value) {
+    filtroDataA.value = filtroDataDa.value;
+  }
+};
+
+// Aggiungi tag da select
+const aggiungiTag = (event) => {
+  const tag = event.target.value;
+  if (tag && !filtroTags.value.includes(tag)) {
+    filtroTags.value.push(tag);
+  }
+  // Reset select
+  event.target.value = "";
+};
+
+// Rimuovi tag specifico
+const rimuoviTag = (tag) => {
+  const idx = filtroTags.value.indexOf(tag);
+  if (idx > -1) {
+    filtroTags.value.splice(idx, 1);
+  }
+};
+
+// Reset tutti i filtri avanzati
+const resettaFiltri = () => {
+  filtroCategoria.value = ""; // singola categoria
+  filtroTags.value = [];
+  filtroDataDa.value = "";
+  filtroDataA.value = "";
+  filtroDescrizione.value = "";
+};
+
+// Applica filtri (chiude modale mobile)
+const applicaFiltri = () => {
+  showFiltersAdvanced.value = false;
+  // I filtri sono già reattivi, non serve ricaricare
+};
 
 // ================== MODALE DETTAGLIO ==================
 const apriDettaglio = (mov, mode = "view") => {
@@ -160,11 +305,12 @@ onMounted(caricaMovimenti);
         </div>
       </div>
 
-      <!-- BARRA FILTRI -->
+      <!-- BARRA FILTRI COMPATTA -->
       <div class="mov-filters mt-3">
-        <div class="row g-2 align-items-end">
+        <!-- Desktop: Filtri in una riga -->
+        <div class="d-none d-md-flex align-items-end gap-2 flex-wrap">
           <!-- UTENTE -->
-          <div class="col-6 col-md-3">
+          <div style="min-width: 120px;">
             <label class="small text-muted mb-1 d-block">Utente</label>
             <select v-model="filtroUtente" class="form-select form-select-sm">
               <option value="all">Tutti</option>
@@ -175,7 +321,7 @@ onMounted(caricaMovimenti);
           </div>
 
           <!-- CONTO -->
-          <div class="col-6 col-md-3">
+          <div style="min-width: 120px;">
             <label class="small text-muted mb-1 d-block">Conto</label>
             <select v-model="filtroConto" class="form-select form-select-sm">
               <option value="all">Tutti</option>
@@ -185,17 +331,202 @@ onMounted(caricaMovimenti);
             </select>
           </div>
 
-          <!-- INFO RISULTATI -->
-          <div
-            class="col-12 col-md-auto ms-md-auto text-end small text-muted mt-2 mt-md-0"
-          >
-            <span v-if="loading">
-              <span class="spinner-border spinner-border-sm me-1" />
-              Caricamento...
-            </span>
-            <span v-else>
-              {{ movimentiFiltrati.length }} movimenti trovati
-            </span>
+          <!-- CATEGORIA -->
+          <div style="min-width: 140px;">
+            <label class="small text-muted mb-1 d-block">Categoria</label>
+            <select v-model="filtroCategoria" class="form-select form-select-sm">
+              <option value="">Tutte</option>
+              <option v-for="cat in listaCategorie" :key="cat.nome" :value="cat.nome">
+                {{ cat.nome }}
+              </option>
+            </select>
+          </div>
+
+          <!-- TAGS -->
+          <div style="min-width: 140px;">
+            <label class="small text-muted mb-1 d-block">Tags</label>
+            <select @change="aggiungiTag" class="form-select form-select-sm">
+              <option value="">+ Tag</option>
+              <option v-for="tag in listaTags" :key="tag.nome" :value="tag.nome" :disabled="filtroTags.includes(tag.nome)">
+                {{ tag.nome }}
+              </option>
+            </select>
+          </div>
+
+          <!-- DATA DA -->
+          <div style="min-width: 140px;">
+            <label class="small text-muted mb-1 d-block">Da</label>
+            <input v-model="filtroDataDa" @change="onDataDaChange" type="date" class="form-control form-control-sm" />
+          </div>
+
+          <!-- DATA A -->
+          <div style="min-width: 140px;">
+            <label class="small text-muted mb-1 d-block">A</label>
+            <input v-model="filtroDataA" :min="filtroDataDa" type="date" class="form-control form-control-sm" />
+          </div>
+
+          <!-- DESCRIZIONE -->
+          <div class="flex-grow-1 position-relative" style="min-width: 200px;">
+            <label class="small text-muted mb-1 d-block">Descrizione</label>
+            <input
+              v-model="filtroDescrizione"
+              @focus="onDescrizioneFocus"
+              @blur="onDescrizioneBlur"
+              @input="showAutocomplete = descrizioniSuggerite.length > 0"
+              type="text"
+              class="form-control form-control-sm"
+              placeholder="Cerca..."
+            />
+            <!-- Autocomplete -->
+            <div v-show="showAutocomplete && descrizioniSuggerite.length > 0" class="autocomplete-dropdown">
+              <div
+                v-for="(desc, idx) in descrizioniSuggerite"
+                :key="idx"
+                @mousedown="selezionaSuggerimento(desc)"
+                class="autocomplete-item"
+              >
+                <i class="bi bi-search me-2 text-muted"></i>
+                {{ desc }}
+              </div>
+            </div>
+          </div>
+
+          <!-- CERCA -->
+          <div>
+            <Button text="Cerca" icon="bi-search" variant="primary" @click="caricaMovimenti" />
+          </div>
+
+          <!-- RESET -->
+          <div>
+            <button @click="resettaFiltri" class="btn btn-sm btn-outline-secondary" title="Reset filtri">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Mobile: Bottoni compatti + Modale -->
+        <div class="d-md-none">
+          <div class="d-flex gap-2 align-items-center">
+            <!-- Filtri rapidi inline -->
+            <select v-model="filtroUtente" class="form-select form-select-sm flex-fill">
+              <option value="all">Tutti</option>
+              <option v-for="u in utentiOptions" :key="u.id" :value="u.id">{{ u.nome }}</option>
+            </select>
+
+            <!-- Bottone filtri avanzati (apre modale) -->
+            <button @click="showFiltersAdvanced = true" class="btn btn-sm btn-primary">
+              <i class="bi bi-funnel-fill"></i>
+              Filtri
+            </button>
+
+            <!-- Bottone cerca -->
+            <button @click="caricaMovimenti" class="btn btn-sm btn-success">
+              <i class="bi bi-search"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Tags selezionati (visibili sempre se presenti) -->
+        <div v-if="filtroTags.length > 0" class="selected-tags-row mt-2">
+          <span v-for="tag in filtroTags" :key="tag" class="selected-tag-badge-small">
+            #{{ tag }}
+            <i @click="rimuoviTag(tag)" class="bi bi-x-circle-fill ms-1"></i>
+          </span>
+        </div>
+
+        <!-- Contatore risultati -->
+        <div class="text-center text-md-end small mt-2">
+          <span v-if="loading" class="text-muted">
+            <span class="spinner-border spinner-border-sm me-1" />
+            Caricamento...
+          </span>
+          <span v-else class="badge bg-primary">
+            <i class="bi bi-list-check me-1"></i>
+            {{ movimentiFiltrati.length }} risultati
+          </span>
+        </div>
+      </div>
+
+      <!-- MODALE FILTRI MOBILE (Full Screen) -->
+      <div v-if="showFiltersAdvanced" class="mobile-filters-modal d-md-none">
+        <div class="modal-content-mobile">
+          <div class="modal-header-mobile">
+            <h5 class="mb-0"><i class="bi bi-funnel-fill me-2"></i>Filtri Ricerca</h5>
+            <button @click="showFiltersAdvanced = false" class="btn-close-mobile">
+              <i class="bi bi-x-lg"></i>
+            </button>
+          </div>
+
+          <div class="modal-body-mobile">
+            <!-- CONTO -->
+            <div class="mb-3">
+              <label class="small text-muted mb-1 d-block fw-bold">Conto</label>
+              <select v-model="filtroConto" class="form-select">
+                <option value="all">Tutti</option>
+                <option v-for="c in contiOptions" :key="c" :value="c">{{ c }}</option>
+              </select>
+            </div>
+
+            <!-- CATEGORIA -->
+            <div class="mb-3">
+              <label class="small text-muted mb-1 d-block fw-bold">Categoria</label>
+              <select v-model="filtroCategoria" class="form-select">
+                <option value="">Tutte</option>
+                <option v-for="cat in listaCategorie" :key="cat.nome" :value="cat.nome">
+                  {{ cat.nome }}
+                </option>
+              </select>
+            </div>
+
+            <!-- TAGS -->
+            <div class="mb-3">
+              <label class="small text-muted mb-1 d-block fw-bold">Tags</label>
+              <select @change="aggiungiTag" class="form-select">
+                <option value="">+ Aggiungi tag</option>
+                <option v-for="tag in listaTags" :key="tag.nome" :value="tag.nome" :disabled="filtroTags.includes(tag.nome)">
+                  {{ tag.nome }}
+                </option>
+              </select>
+              <div v-if="filtroTags.length > 0" class="mt-2">
+                <span v-for="tag in filtroTags" :key="tag" class="selected-tag-badge-small me-1">
+                  #{{ tag }}
+                  <i @click="rimuoviTag(tag)" class="bi bi-x-circle-fill ms-1"></i>
+                </span>
+              </div>
+            </div>
+
+            <!-- DATE -->
+            <div class="mb-3">
+              <label class="small text-muted mb-1 d-block fw-bold">Data da</label>
+              <input v-model="filtroDataDa" @change="onDataDaChange" type="date" class="form-control" />
+            </div>
+
+            <div class="mb-3">
+              <label class="small text-muted mb-1 d-block fw-bold">Data a</label>
+              <input v-model="filtroDataA" :min="filtroDataDa" type="date" class="form-control" />
+            </div>
+
+            <!-- DESCRIZIONE -->
+            <div class="mb-3">
+              <label class="small text-muted mb-1 d-block fw-bold">Descrizione</label>
+              <input
+                v-model="filtroDescrizione"
+                type="text"
+                class="form-control"
+                placeholder="Cerca nella descrizione..."
+              />
+            </div>
+          </div>
+
+          <div class="modal-footer-mobile">
+            <button @click="resettaFiltri" class="btn btn-outline-secondary flex-fill">
+              <i class="bi bi-arrow-counterclockwise me-1"></i>
+              Reset
+            </button>
+            <button @click="applicaFiltri" class="btn btn-primary flex-fill">
+              <i class="bi bi-check-lg me-1"></i>
+              Applica
+            </button>
           </div>
         </div>
       </div>
@@ -296,22 +627,169 @@ onMounted(caricaMovimenti);
   border-radius: 10px;
 }
 
-/* Box filtri */
+/* Box filtri - Compatto */
 .mov-filters {
-  background-color: #f9fafb;
-  border-radius: 12px;
-  padding: 10px 12px;
-  border: 1px solid #e5e7eb;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #dee2e6;
 }
 
-/* Bottoni azione (Importa / Nuovo) */
+/* Tag badge piccoli (per riga tags selezionati) */
+.selected-tags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.selected-tag-badge-small {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #1e293b;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.selected-tag-badge-small i {
+  opacity: 0.7;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.selected-tag-badge-small i:hover {
+  opacity: 1;
+  color: #dc2626;
+}
+
+/* Autocomplete dropdown */
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dee2e6;
+  max-height: 200px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  margin-top: 2px;
+  border-radius: 4px;
+}
+
+.autocomplete-item {
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #f1f3f5;
+  transition: background 0.15s ease;
+  display: flex;
+  align-items: center;
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover {
+  background: #f8f9fa;
+  color: #6366f1;
+}
+
+/* MODALE FILTRI MOBILE (Full Screen) */
+.mobile-filters-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1050;
+  display: flex;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content-mobile {
+  background: white;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.modal-header-mobile {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #6366f1;
+  color: white;
+}
+
+.modal-header-mobile h5 {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.btn-close-mobile {
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  padding: 8px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.btn-close-mobile:hover {
+  opacity: 1;
+}
+
+.modal-body-mobile {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.modal-footer-mobile {
+  padding: 16px 20px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 12px;
+  background: #f9fafb;
+}
+
+/* Bottoni azione */
 .mov-action-btn {
   min-width: 140px;
 }
 
-@media (max-width: 576px) {
+/* Mobile responsive */
+@media (max-width: 768px) {
   .mov-filters {
-    padding: 8px 10px;
+    padding: 10px;
   }
 
   .mov-action-btn {
